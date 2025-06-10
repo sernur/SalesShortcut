@@ -6,9 +6,9 @@ from typing import Dict, Any
 from google.adk.tools import ToolContext
 import requests
 import json
-from lead_finder.config import GOOGLE_MAPS_API_KEY
+from ..config import GOOGLE_MAPS_API_KEY
 
-def google_maps_search(city: str, tool_context: ToolContext) -> Dict[str, Any]:
+def google_maps_search(city: str, tool_context: ToolContext) -> dict[str, Any]:
     """
     Implementation of Google Maps search for businesses in a specified city.
     

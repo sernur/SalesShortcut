@@ -3,9 +3,9 @@ MergerAgent implementation.
 """
 
 from google.adk.agents.llm_agent import Agent
-from lead_finder.config import MODEL
-from lead_finder.prompts import MERGER_AGENT_PROMPT
-from lead_finder.tools.bigquery_utils import bigquery_upload
+from ..config import MODEL
+from ..prompts import MERGER_AGENT_PROMPT
+from ..tools.bigquery_utils import bigquery_upload
 
 merger_agent = Agent(
     model=MODEL,

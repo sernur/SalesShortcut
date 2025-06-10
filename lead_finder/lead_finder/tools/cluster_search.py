@@ -5,7 +5,7 @@ Custom cluster search tool implementation.
 from typing import Dict, Any, List
 from google.adk.tools import ToolContext
 
-def cluster_search(city: str, tool_context: ToolContext) -> Dict[str, Any]:
+def cluster_search(city: str, tool_context: ToolContext) -> dict[str, Any]:
     """
     Implementation of custom cluster search for businesses in a specified city.
     

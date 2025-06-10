@@ -5,7 +5,7 @@ Utility functions for the Lead Finder Agent.
 from typing import Dict, Any, List
 import json
 
-def deduplicate_businesses(businesses: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def deduplicate_businesses(businesses: List[dict[str, Any]]) -> List[dict[str, Any]]:
     """
     Deduplicate business data based on name and address.
     
@@ -30,7 +30,7 @@ def deduplicate_businesses(businesses: List[Dict[str, Any]]) -> List[Dict[str, A
     
     return list(unique_businesses.values())
 
-def format_business_for_bigquery(business: Dict[str, Any]) -> Dict[str, Any]:
+def format_business_for_bigquery(business: dict[str, Any]) -> dict[str, Any]:
     """
     Format business data for BigQuery upload.
     
