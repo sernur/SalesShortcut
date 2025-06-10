@@ -41,6 +41,13 @@ if [ "$PROJECT_ID" == "your-gcp-project-id" ]; then
   exit 1
 fi
 
+# Check if GOOGLE_API_KEY is set
+if [ -z "$GOOGLE_API_KEY" ]; then
+  echo "ERROR: Please set GOOGLE_API_KEY environment variable for Gemini LLM inference."
+  echo "Example: export GOOGLE_API_KEY='your-api-key' && ./deploy_cloud_run.sh"
+  exit 1
+fi
+
 # --- Pre-flight Checks ---
 echo "Using Project ID: $PROJECT_ID"
 echo "Using Region: $REGION"
@@ -73,6 +80,7 @@ gcloud run deploy $CALENDAR_ASSISTANT_SERVICE_NAME \
     --platform managed \
     --region $REGION \
     --allow-unauthenticated \
+    --set-env-vars="GOOGLE_API_KEY=$GOOGLE_API_KEY" \
     --project=$PROJECT_ID
 
 # Step 1.3: Get Service URL
@@ -96,6 +104,7 @@ gcloud run deploy $LEAD_FINDER_SERVICE_NAME \
     --platform managed \
     --region $REGION \
     --allow-unauthenticated \
+    --set-env-vars="GOOGLE_API_KEY=$GOOGLE_API_KEY" \
     --project=$PROJECT_ID
 
 # Step 2.3: Get Service URL
@@ -119,7 +128,7 @@ gcloud run deploy $LEAD_MANAGER_SERVICE_NAME \
     --platform managed \
     --region $REGION \
     --allow-unauthenticated \
-    --set-env-vars="LEAD_FINDER_SERVICE_URL=$LEAD_FINDER_SERVICE_URL" \
+    --set-env-vars="GOOGLE_API_KEY=$GOOGLE_API_KEY,LEAD_FINDER_SERVICE_URL=$LEAD_FINDER_SERVICE_URL" \
     --project=$PROJECT_ID
 
 # Step 3.3: Get Service URL
@@ -143,7 +152,7 @@ gcloud run deploy $OUTREACH_SERVICE_NAME \
     --platform managed \
     --region $REGION \
     --allow-unauthenticated \
-    --set-env-vars="LEAD_MANAGER_SERVICE_URL=$LEAD_MANAGER_SERVICE_URL" \
+    --set-env-vars="GOOGLE_API_KEY=$GOOGLE_API_KEY,LEAD_MANAGER_SERVICE_URL=$LEAD_MANAGER_SERVICE_URL" \
     --project=$PROJECT_ID
 
 # Step 4.3: Get Service URL
@@ -167,7 +176,7 @@ gcloud run deploy $SDR_SERVICE_NAME \
     --platform managed \
     --region $REGION \
     --allow-unauthenticated \
-    --set-env-vars="OUTREACH_SERVICE_URL=$OUTREACH_SERVICE_URL" \
+    --set-env-vars="GOOGLE_API_KEY=$GOOGLE_API_KEY,OUTREACH_SERVICE_URL=$OUTREACH_SERVICE_URL" \
     --project=$PROJECT_ID
 
 # Step 5.3: Get Service URL
@@ -191,7 +200,7 @@ gcloud run deploy $UI_CLIENT_SERVICE_NAME \
     --platform managed \
     --region $REGION \
     --allow-unauthenticated \
-    --set-env-vars="CALENDAR_ASSISTANT_SERVICE_URL=$CALENDAR_ASSISTANT_SERVICE_URL,LEAD_FINDER_SERVICE_URL=$LEAD_FINDER_SERVICE_URL,LEAD_MANAGER_SERVICE_URL=$LEAD_MANAGER_SERVICE_URL,OUTREACH_SERVICE_URL=$OUTREACH_SERVICE_URL,SDR_SERVICE_URL=$SDR_SERVICE_URL" \
+    --set-env-vars="GOOGLE_API_KEY=$GOOGLE_API_KEY,CALENDAR_ASSISTANT_SERVICE_URL=$CALENDAR_ASSISTANT_SERVICE_URL,LEAD_FINDER_SERVICE_URL=$LEAD_FINDER_SERVICE_URL,LEAD_MANAGER_SERVICE_URL=$LEAD_MANAGER_SERVICE_URL,OUTREACH_SERVICE_URL=$OUTREACH_SERVICE_URL,SDR_SERVICE_URL=$SDR_SERVICE_URL" \
     --project=$PROJECT_ID
 
 # Step 6.3: Get Service URL
