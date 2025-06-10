@@ -53,7 +53,7 @@ check_env:
 	@if [ -n "$(OPENAI_API_KEY)" ]; then echo "✅ OPENAI_API_KEY is set"; else echo "⚠️  OPENAI_API_KEY is not set (optional)"; fi
 	@if [ -n "$(ANTHROPIC_API_KEY)" ]; then echo "✅ ANTHROPIC_API_KEY is set"; else echo "⚠️  ANTHROPIC_API_KEY is not set (optional)"; fi
 
-deploy_local: check_env
+deploy_local: clean check_env
 	@echo "🚀 Deploying all services locally..."
 	@chmod +x ./deploy_local.sh
 	@GOOGLE_API_KEY="$(GOOGLE_API_KEY)" \
@@ -69,7 +69,7 @@ deploy_cloud: check_env
 	 ANTHROPIC_API_KEY="$(ANTHROPIC_API_KEY)" \
 	 ./deploy_cloud_run.sh
 
-test_local: check_env
+test_local: clean check_env
 	@echo "🧪 Running local test deployment (UI Client + Lead Manager)..."
 	@chmod +x ./test_local.sh
 	@GOOGLE_API_KEY="$(GOOGLE_API_KEY)" \

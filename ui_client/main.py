@@ -100,7 +100,7 @@ class AgentUpdate(BaseModel):
     status: BusinessStatus
     message: str
     timestamp: datetime = Field(default_factory=datetime.now)
-    data: Optional[Dict[str, Any]] = None
+    data: Optional[dict[str, Any]] = None
 
 class LeadFinderRequest(BaseModel):
     city: str = Field(..., min_length=1, max_length=100, description="Target city for lead finding")
@@ -109,7 +109,7 @@ class LeadFinderRequest(BaseModel):
 app_state = {
     "is_running": False,
     "current_city": None,
-    "businesses": {},  # Dict[str, Business]
+    "businesses": {},  # dict[str, Business]
     "agent_updates": [],  # List[AgentUpdate]
     "websocket_connections": set(),  # Set[WebSocket]
     "session_id": None,
@@ -130,7 +130,7 @@ class ConnectionManager:
         self.active_connections.discard(websocket)
         logger.info(f"WebSocket disconnected. Total connections: {len(self.active_connections)}")
     
-    async def send_update(self, data: Dict[str, Any]):
+    async def send_update(self, data: dict[str, Any]):
         """Send update to all connected clients."""
         if not self.active_connections:
             return
@@ -177,7 +177,7 @@ def format_datetime(dt: datetime) -> str:
 templates.env.filters["format_currency"] = format_currency
 templates.env.filters["format_datetime"] = format_datetime
 
-async def call_lead_finder_agent_a2a(city: str, session_id: str) -> Dict[str, Any]:
+async def call_lead_finder_agent_a2a(city: str, session_id: str) -> dict[str, Any]:
     """
     Calls the Lead Finder agent via A2A to find businesses in the specified city.
     """
@@ -292,7 +292,7 @@ async def call_lead_finder_agent_a2a(city: str, session_id: str) -> Dict[str, An
     
     return outcome
 
-async def call_lead_finder_agent_simple(city: str, session_id: str) -> Dict[str, Any]:
+async def call_lead_finder_agent_simple(city: str, session_id: str) -> dict[str, Any]:
     """
     Calls the Lead Finder service via simple HTTP POST when A2A is not available.
     """
@@ -368,7 +368,7 @@ async def call_lead_finder_agent_simple(city: str, session_id: str) -> Dict[str,
     
     return outcome
 
-async def call_lead_finder_agent(city: str, session_id: str) -> Dict[str, Any]:
+async def call_lead_finder_agent(city: str, session_id: str) -> dict[str, Any]:
     """
     Calls the Lead Finder agent - uses A2A if available, otherwise falls back to simple HTTP.
     """
@@ -377,34 +377,55 @@ async def call_lead_finder_agent(city: str, session_id: str) -> Dict[str, Any]:
     else:
         return await call_lead_finder_agent_simple(city, session_id)
 
-async def process_lead_finder_results(businesses_data: List[Dict], city: str):
-    """Process lead finder results and update app state."""
+async def run_lead_finding_process(city: str, session_id: str):
+    """Run the complete lead finding process."""
     business_logger = logging.getLogger(BUSINESS_LOGIC_LOGGER)
     
-    for business_data in businesses_data:
-        try:
-            business = Business(
-                name=business_data.get("name", "Unknown"),
-                phone=business_data.get("phone"),
-                email=business_data.get("email"),
-                description=business_data.get("description"),
-                city=city,
-                status=BusinessStatus.FOUND,
-            )
+    try:
+        business_logger.info(f"Starting lead finding process for {city}")
+        
+        # Call Lead Finder agent
+        result = await call_lead_finder_agent(city, session_id)
+        
+        if result["success"]:
+            found_businesses = result.get("businesses", [])
+            business_logger.info(f"Lead Finder returned {len(found_businesses)} businesses")
+
+            # --- This is the key change ---
+            # Check if the returned list is empty
+            if not found_businesses:
+                business_logger.info(f"No businesses found for city: {city}. Notifying UI.")
+                await manager.send_update({
+                    "type": "lead_finding_empty",
+                    "city": city,
+                    "message": "Nothing found, try another city.",
+                    "timestamp": datetime.now().isoformat(),
+                })
             
-            app_state["businesses"][business.id] = business
-            business_logger.info(f"Added business: {business.name}")
-            
-            # Send real-time update
+        else:
+            business_logger.error(f"Lead finding failed: {result['error']}")
             await manager.send_update({
-                "type": "business_added",
-                "agent": AgentType.LEAD_FINDER,
-                "business": business.dict(),
+                "type": "lead_finding_failed",
+                "error": result["error"],
                 "timestamp": datetime.now().isoformat(),
             })
-            
-        except Exception as e:
-            business_logger.error(f"Error processing business data {business_data}: {e}")
+    
+    except Exception as e:
+        business_logger.error(f"Error in lead finding process: {e}", exc_info=True)
+        await manager.send_update({
+            "type": "lead_finding_failed",
+            "error": str(e),
+            "timestamp": datetime.now().isoformat(),
+        })
+    
+    finally:
+        # The process is no longer running, regardless of outcome
+        app_state["is_running"] = False
+        # Also send an update to the UI so it can re-enable buttons etc.
+        await manager.send_update({
+            "type": "process_finished",
+            "timestamp": datetime.now().isoformat(),
+        })
 
 # WebSocket endpoint for real-time updates
 @app.websocket("/ws")

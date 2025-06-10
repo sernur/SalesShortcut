@@ -28,9 +28,9 @@ GOOGLE_API_KEY="$GOOGLE_API_KEY" python -m lead_finder &
 LEAD_FINDER_PID=$!
 echo "Lead Finder started with PID: $LEAD_FINDER_PID"
 
-# Start Lead Manager (Port: 8001)
+# Start Lead Manager (Port: 8082)
 echo "Starting Lead Manager service in the background..."
-GOOGLE_API_KEY="$GOOGLE_API_KEY" python -m lead_manager --port 8001 &
+GOOGLE_API_KEY="$GOOGLE_API_KEY" python -m lead_manager --port 8082 &
 LEAD_MANAGER_PID=$!
 echo "Lead Manager started with PID: $LEAD_MANAGER_PID"
 
@@ -56,7 +56,7 @@ echo "--------------------------------------------------"
 echo "Local services started:"
 echo "  Calendar Assistant: http://127.0.0.1:8080 (PID: $CALENDAR_PID)"
 echo "  Lead Finder:        http://127.0.0.1:8081 (PID: $LEAD_FINDER_PID)"
-echo "  Lead Manager:       http://127.0.0.1:8001 (PID: $LEAD_MANAGER_PID)"
+echo "  Lead Manager:       http://127.0.0.1:8082 (PID: $LEAD_MANAGER_PID)"
 echo "  Outreach:           http://127.0.0.1:8083 (PID: $OUTREACH_PID)"
 echo "  SDR:                http://127.0.0.1:8084 (PID: $SDR_PID)"
 echo "  UI Client:          http://127.0.0.1:8000 (PID: $UI_CLIENT_PID)"

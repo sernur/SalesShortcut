@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Model configuration
-MODEL = os.getenv("MODEL", "gemini-1.5-pro")
+MODEL = os.getenv("MODEL", "gemini-2.0-flash-lite")
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.2"))
 TOP_P = float(os.getenv("TOP_P", "0.95"))
 TOP_K = int(os.getenv("TOP_K", "40"))

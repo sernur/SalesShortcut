@@ -1,5 +1,6 @@
 import logging
 import click
+import common.config as config
 from a2a.server.apps import A2AStarletteApplication
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     "--port",
-    default=8001,
+    default=config.DEFAULT_LEAD_MANAGER_PORT,
     help="Port to bind the server to.",
 )
 def main(host: str, port: int):

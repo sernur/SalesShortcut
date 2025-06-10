@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
 import click
+import common.config as config
 
 app = FastAPI()
 
@@ -57,7 +58,7 @@ async def process_search(request: SearchRequest):
 
 @click.command()
 @click.option("--host", default="localhost", help="Host to bind the server to.")
-@click.option("--port", default=8001, help="Port to bind the server to.")
+@click.option("--port", default=config.DEFAULT_LEAD_MANAGER_PORT, help="Port to bind the server to.")
 def main(host: str, port: int):
     """Run the simple Lead Manager service."""
     print(f"Starting simple Lead Manager service on http://{host}:{port}/")

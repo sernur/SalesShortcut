@@ -5,9 +5,9 @@ BigQuery utility tools.
 from typing import Dict, Any, List
 from google.adk.tools import ToolContext
 from google.cloud import bigquery
-from lead_finder.config import PROJECT, DATASET_ID, TABLE_ID
+from ..config import PROJECT, DATASET_ID, TABLE_ID
 
-def bigquery_upload(data: List[Dict[str, Any]], tool_context: ToolContext) -> Dict[str, Any]:
+def bigquery_upload(data: List[dict[str, Any]], tool_context: ToolContext) -> dict[str, Any]:
     """
     BigQuery upload tool.
     
