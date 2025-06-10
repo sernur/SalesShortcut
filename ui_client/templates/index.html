@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A2A Lead Search</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 70%;
+            padding: 10px;
+            margin-right: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #messages {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: monospace;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+        .message.ui_client {
+            border-left: 4px solid #007bff;
+            background-color: #e3f2fd;
+        }
+        .message.lead_manager {
+            border-left: 4px solid #28a745;
+            background-color: #e8f5e8;
+        }
+        .message.system {
+            border-left: 4px solid #6c757d;
+            background-color: #f8f9fa;
+        }
+        .message.error {
+            border-left: 4px solid #dc3545;
+            background-color: #ffeaea;
+        }
+        .sender {
+            font-weight: bold;
+            color: #495057;
+            font-size: 0.9em;
+            margin-bottom: 2px;
+        }
+    </style>
+</head>
+<body>
+    <h1>A2A Lead Search Application</h1>
+    
+    <div class="container">
+        <form id="searchForm">
+            <input type="text" name="search_query" id="searchQuery" placeholder="Enter your search query..." required>
+            <button type="submit">Run Search</button>
+        </form>
+    </div>
+
+    <div class="container">
+        <h3>Messages from Lead Manager:</h3>
+        <div id="messages"></div>
+    </div>
+
+    <script>
+        const ws = new WebSocket(`ws://${window.location.host}/ws`);
+        const messages = document.getElementById('messages');
+
+        ws.onmessage = function(event) {
+            const messageDiv = document.createElement('div');
+            let messageData;
+            let sender = 'system';
+            let content = event.data;
+            let messageType = 'system';
+            
+            // Try to parse as JSON
+            try {
+                messageData = JSON.parse(event.data);
+                sender = messageData.sender || 'system';
+                content = messageData.content || event.data;
+                messageType = messageData.type || 'system';
+            } catch (e) {
+                // If not JSON, treat as plain text
+                content = event.data;
+            }
+            
+            // Set CSS class based on sender
+            messageDiv.className = `message ${sender}`;
+            if (messageType === 'error_message') {
+                messageDiv.className += ' error';
+            }
+            
+            // Format sender name for display
+            const senderDisplay = sender.replace('_', ' ').toUpperCase();
+            
+            messageDiv.innerHTML = `
+                <div class="sender">[${senderDisplay}]</div>
+                <div><strong>${new Date().toLocaleTimeString()}:</strong> ${content}</div>
+            `;
+            messages.appendChild(messageDiv);
+            messages.scrollTop = messages.scrollHeight;
+        };
+
+        ws.onopen = function(event) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message system';
+            messageDiv.innerHTML = `
+                <div class="sender">[SYSTEM]</div>
+                <div><strong>${new Date().toLocaleTimeString()}:</strong> <em>Connected to WebSocket</em></div>
+            `;
+            messages.appendChild(messageDiv);
+        };
+
+        ws.onclose = function(event) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message system';
+            messageDiv.innerHTML = `
+                <div class="sender">[SYSTEM]</div>
+                <div><strong>${new Date().toLocaleTimeString()}:</strong> <em>Connection closed</em></div>
+            `;
+            messages.appendChild(messageDiv);
+        };
+
+        document.getElementById('searchForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            // Collect form data and encode as URL-encoded
+            const formData = new FormData(this);
+            const params = new URLSearchParams();
+            for (const [key, value] of formData.entries()) {
+                params.append(key, value);
+            }
+            fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: params.toString()
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Search response:', data);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+        });
+    </script>
+</body>
+</html>
