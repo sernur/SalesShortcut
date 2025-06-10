@@ -3,173 +3,144 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>A2A Lead Search</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .container {
-            background-color: #f5f5f5;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-        input[type="text"] {
-            width: 70%;
-            padding: 10px;
-            margin-right: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        button {
-            padding: 10px 20px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        #messages {
-            background-color: #fff;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 15px;
-            height: 300px;
-            overflow-y: auto;
-            font-family: monospace;
-        }
-        .message {
-            margin-bottom: 10px;
-            padding: 8px;
-            border-radius: 4px;
-            background-color: #f8f9fa;
-        }
-        .message.ui_client {
-            border-left: 4px solid #007bff;
-            background-color: #e3f2fd;
-        }
-        .message.lead_manager {
-            border-left: 4px solid #28a745;
-            background-color: #e8f5e8;
-        }
-        .message.system {
-            border-left: 4px solid #6c757d;
-            background-color: #f8f9fa;
-        }
-        .message.error {
-            border-left: 4px solid #dc3545;
-            background-color: #ffeaea;
-        }
-        .sender {
-            font-weight: bold;
-            color: #495057;
-            font-size: 0.9em;
-            margin-bottom: 2px;
-        }
-    </style>
+    <title>SalesShortcut - Lead Generation Platform</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', path='css/style.css') }}" rel="stylesheet">
 </head>
 <body>
-    <h1>A2A Lead Search Application</h1>
-    
     <div class="container">
-        <form id="searchForm">
-            <input type="text" name="search_query" id="searchQuery" placeholder="Enter your search query..." required>
-            <button type="submit">Run Search</button>
-        </form>
-    </div>
+        <div class="header">
+            <div class="logo">
+                <i class="fas fa-rocket"></i>
+                <h1>SalesShortcut</h1>
+            </div>
+            <p class="subtitle">AI-Powered Lead Generation & Management Platform</p>
+        </div>
 
-    <div class="container">
-        <h3>Messages from Lead Manager:</h3>
-        <div id="messages"></div>
+        <div class="main-card">
+            <div class="card-header">
+                <i class="fas fa-map-marker-alt"></i>
+                <h2>Start Lead Generation</h2>
+            </div>
+            
+            <div class="card-body">
+                <p class="description">
+                    Enter a city name to begin the automated lead generation process. 
+                    Our AI agents will find, contact, and qualify potential customers in your target market.
+                </p>
+
+                <form action="/start_lead_finding" method="post" class="search-form">
+                    <div class="input-group">
+                        <label for="city">Target City</label>
+                        <div class="input-container">
+                            <i class="fas fa-city input-icon"></i>
+                            <input 
+                                type="text" 
+                                id="city" 
+                                name="city" 
+                                placeholder="e.g., San Francisco, New York, Austin"
+                                required
+                                maxlength="100"
+                                autocomplete="off"
+                            >
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="run-button">
+                        <i class="fas fa-play"></i>
+                        Run Agents
+                    </button>
+                </form>
+
+                <div class="process-info">
+                    <h3><i class="fas fa-cogs"></i> What happens next?</h3>
+                    <div class="process-steps">
+                        <div class="step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <h4>Lead Finder</h4>
+                                <p>Discovers potential businesses in your target city</p>
+                            </div>
+                        </div>
+                        
+                        <div class="step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <h4>SDR Agent</h4>
+                                <p>Engages with prospects and qualifies their interest</p>
+                            </div>
+                        </div>
+                        
+                        <div class="step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <h4>Lead Manager</h4>
+                                <p>Converts qualified leads into sales opportunities</p>
+                            </div>
+                        </div>
+                        
+                        <div class="step">
+                            <div class="step-number">4</div>
+                            <div class="step-content">
+                                <h4>Calendar Agent</h4>
+                                <p>Schedules meetings with hot prospects</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="features">
+            <div class="feature">
+                <i class="fas fa-bolt"></i>
+                <h3>Automated</h3>
+                <p>Fully automated lead generation pipeline</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-chart-line"></i>
+                <h3>Real-time</h3>
+                <p>Live updates and progress tracking</p>
+            </div>
+            <div class="feature">
+                <i class="fas fa-target"></i>
+                <h3>Targeted</h3>
+                <p>City-specific lead generation</p>
+            </div>
+        </div>
     </div>
 
     <script>
-        const ws = new WebSocket(`ws://${window.location.host}/ws`);
-        const messages = document.getElementById('messages');
-
-        ws.onmessage = function(event) {
-            const messageDiv = document.createElement('div');
-            let messageData;
-            let sender = 'system';
-            let content = event.data;
-            let messageType = 'system';
+        // Add some interactive feedback
+        document.querySelector('.search-form').addEventListener('submit', function(e) {
+            const button = document.querySelector('.run-button');
+            const originalText = button.innerHTML;
             
-            // Try to parse as JSON
-            try {
-                messageData = JSON.parse(event.data);
-                sender = messageData.sender || 'system';
-                content = messageData.content || event.data;
-                messageType = messageData.type || 'system';
-            } catch (e) {
-                // If not JSON, treat as plain text
-                content = event.data;
-            }
+            button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Starting Agents...';
+            button.disabled = true;
             
-            // Set CSS class based on sender
-            messageDiv.className = `message ${sender}`;
-            if (messageType === 'error_message') {
-                messageDiv.className += ' error';
-            }
-            
-            // Format sender name for display
-            const senderDisplay = sender.replace('_', ' ').toUpperCase();
-            
-            messageDiv.innerHTML = `
-                <div class="sender">[${senderDisplay}]</div>
-                <div><strong>${new Date().toLocaleTimeString()}:</strong> ${content}</div>
-            `;
-            messages.appendChild(messageDiv);
-            messages.scrollTop = messages.scrollHeight;
-        };
+            // Allow form to submit normally, but provide immediate feedback
+            setTimeout(() => {
+                if (button) {
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                }
+            }, 2000);
+        });
 
-        ws.onopen = function(event) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message system';
-            messageDiv.innerHTML = `
-                <div class="sender">[SYSTEM]</div>
-                <div><strong>${new Date().toLocaleTimeString()}:</strong> <em>Connected to WebSocket</em></div>
-            `;
-            messages.appendChild(messageDiv);
-        };
+        // Auto-focus on input
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('city').focus();
+        });
 
-        ws.onclose = function(event) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message system';
-            messageDiv.innerHTML = `
-                <div class="sender">[SYSTEM]</div>
-                <div><strong>${new Date().toLocaleTimeString()}:</strong> <em>Connection closed</em></div>
-            `;
-            messages.appendChild(messageDiv);
-        };
-
-        document.getElementById('searchForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            // Collect form data and encode as URL-encoded
-            const formData = new FormData(this);
-            const params = new URLSearchParams();
-            for (const [key, value] of formData.entries()) {
-                params.append(key, value);
-            }
-            fetch('/search', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                },
-                body: params.toString()
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Search response:', data);
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
+        // Input validation and formatting
+        document.getElementById('city').addEventListener('input', function(e) {
+            // Capitalize first letter of each word
+            const words = e.target.value.split(' ');
+            const capitalizedWords = words.map(word => 
+                word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+            );
+            e.target.value = capitalizedWords.join(' ');
         });
     </script>
 </body>
