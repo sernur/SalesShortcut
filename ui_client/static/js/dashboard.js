@@ -1,0 +1,537 @@
+// Dashboard JavaScript for SalesShortcut UI Client
+
+class DashboardManager {
+    constructor() {
+        this.websocket = null;
+        this.reconnectInterval = null;
+        this.businesses = new Map();
+        this.isConnected = false;
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 5;
+        
+        this.initializeWebSocket();
+        this.initializeEventListeners();
+        this.updateStats();
+    }
+    
+    initializeWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        
+        try {
+            this.websocket = new WebSocket(wsUrl);
+            this.setupWebSocketHandlers();
+        } catch (error) {
+            console.error('Failed to create WebSocket connection:', error);
+            this.scheduleReconnect();
+        }
+    }
+    
+    setupWebSocketHandlers() {
+        this.websocket.onopen = () => {
+            console.log('WebSocket connected');
+            this.isConnected = true;
+            this.reconnectAttempts = 0;
+            this.updateConnectionStatus(true);
+            
+            if (this.reconnectInterval) {
+                clearInterval(this.reconnectInterval);
+                this.reconnectInterval = null;
+            }
+        };
+        
+        this.websocket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                this.handleWebSocketMessage(data);
+            } catch (error) {
+                console.error('Error parsing WebSocket message:', error);
+            }
+        };
+        
+        this.websocket.onclose = () => {
+            console.log('WebSocket disconnected');
+            this.isConnected = false;
+            this.updateConnectionStatus(false);
+            this.scheduleReconnect();
+        };
+        
+        this.websocket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            this.updateConnectionStatus(false);
+        };
+    }
+    
+    scheduleReconnect() {
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            console.log('Max reconnection attempts reached');
+            return;
+        }
+        
+        if (this.reconnectInterval) {
+            return; // Already scheduled
+        }
+        
+        const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 10000);
+        console.log(`Scheduling reconnect in ${delay}ms`);
+        
+        this.reconnectInterval = setTimeout(() => {
+            this.reconnectAttempts++;
+            this.initializeWebSocket();
+        }, delay);
+    }
+    
+    handleWebSocketMessage(data) {
+        console.log('Received WebSocket message:', data);
+        
+        switch (data.type) {
+            case 'initial_state':
+                this.handleInitialState(data);
+                break;
+            case 'business_added':
+                this.handleBusinessAdded(data);
+                break;
+            case 'business_updated':
+                this.handleBusinessUpdated(data);
+                break;
+            case 'process_started':
+                this.handleProcessStarted(data);
+                break;
+            case 'lead_finding_completed':
+                this.handleLeadFindingCompleted(data);
+                break;
+            case 'lead_finding_failed':
+                this.handleLeadFindingFailed(data);
+                break;
+            case 'state_reset':
+                this.handleStateReset(data);
+                break;
+            default:
+                console.log('Unknown message type:', data.type);
+        }
+    }
+    
+    handleInitialState(data) {
+        console.log('Loading initial state:', data);
+        
+        // Clear existing businesses
+        this.businesses.clear();
+        
+        // Load businesses
+        if (data.businesses) {
+            data.businesses.forEach(business => {
+                this.businesses.set(business.id, business);
+            });
+        }
+        
+        // Update UI
+        this.updateStats();
+        this.updateAgentStatuses(data.is_running);
+    }
+    
+    handleBusinessAdded(data) {
+        console.log('Business added:', data.business);
+        
+        this.businesses.set(data.business.id, data.business);
+        this.addBusinessCard(data.business, data.agent);
+        this.updateStats();
+        this.addActivityLogEntry(data.agent, `Found business: ${data.business.name}`, data.timestamp);
+        this.updateAgentStatus(data.agent, true);
+    }
+    
+    handleBusinessUpdated(data) {
+        console.log('Business updated:', data.business);
+        
+        const oldBusiness = this.businesses.get(data.business.id);
+        this.businesses.set(data.business.id, data.business);
+        
+        // Move business card to appropriate column if status changed
+        if (oldBusiness && oldBusiness.status !== data.business.status) {
+            this.moveBusinessCard(data.business, oldBusiness.status, data.business.status);
+        } else {
+            this.updateBusinessCard(data.business);
+        }
+        
+        this.updateStats();
+        this.addActivityLogEntry(
+            data.agent, 
+            `Updated ${data.business.name}: ${data.update.message}`, 
+            data.timestamp
+        );
+        this.updateAgentStatus(data.agent, true);
+    }
+    
+    handleProcessStarted(data) {
+        console.log('Process started for city:', data.city);
+        this.showLoadingOverlay();
+        this.updateAgentStatus('lead_finder', true);
+        this.addActivityLogEntry('system', `Started lead finding for ${data.city}`, data.timestamp);
+    }
+    
+    handleLeadFindingCompleted(data) {
+        console.log('Lead finding completed:', data);
+        this.hideLoadingOverlay();
+        this.updateAgentStatus('lead_finder', false);
+        this.addActivityLogEntry(
+            'lead_finder', 
+            `Found ${data.business_count} businesses in ${data.city}`, 
+            data.timestamp
+        );
+    }
+    
+    handleLeadFindingFailed(data) {
+        console.log('Lead finding failed:', data);
+        this.hideLoadingOverlay();
+        this.updateAgentStatus('lead_finder', false);
+        this.addActivityLogEntry('lead_finder', `Error: ${data.error}`, data.timestamp);
+        this.showErrorToast(data.error);
+    }
+    
+    handleStateReset(data) {
+        console.log('State reset');
+        this.businesses.clear();
+        this.clearAllBusinessCards();
+        this.updateStats();
+        this.updateAgentStatuses(false);
+        this.addActivityLogEntry('system', 'Dashboard reset', data.timestamp);
+    }
+    
+    addBusinessCard(business, agent) {
+        const column = this.getColumnForStatus(business.status);
+        if (!column) return;
+        
+        const content = column.querySelector('.column-content');
+        const card = this.createBusinessCard(business);
+        
+        // Add with animation
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        content.appendChild(card);
+        
+        // Trigger animation
+        requestAnimationFrame(() => {
+            card.style.transition = 'all 0.3s ease';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        });
+    }
+    
+    updateBusinessCard(business) {
+        const existingCard = document.querySelector(`[data-business-id="${business.id}"]`);
+        if (!existingCard) return;
+        
+        const newCard = this.createBusinessCard(business);
+        existingCard.parentNode.replaceChild(newCard, existingCard);
+    }
+    
+    moveBusinessCard(business, oldStatus, newStatus) {
+        const existingCard = document.querySelector(`[data-business-id="${business.id}"]`);
+        if (!existingCard) {
+            // Card doesn't exist, create new one
+            this.addBusinessCard(business, this.getAgentForStatus(newStatus));
+            return;
+        }
+        
+        const newColumn = this.getColumnForStatus(newStatus);
+        if (!newColumn) return;
+        
+        const newContent = newColumn.querySelector('.column-content');
+        
+        // Remove from old location
+        existingCard.remove();
+        
+        // Create new card in new location
+        const newCard = this.createBusinessCard(business);
+        newCard.style.opacity = '0';
+        newCard.style.transform = 'translateY(20px)';
+        newContent.appendChild(newCard);
+        
+        // Animate in
+        requestAnimationFrame(() => {
+            newCard.style.transition = 'all 0.3s ease';
+            newCard.style.opacity = '1';
+            newCard.style.transform = 'translateY(0)';
+        });
+    }
+    
+    createBusinessCard(business) {
+        const card = document.createElement('div');
+        card.className = `business-card ${business.status === 'meeting_scheduled' ? 'meeting-card' : ''}`;
+        card.setAttribute('data-business-id', business.id);
+        
+        const statusText = this.getStatusText(business.status);
+        const statusClass = business.status.replace('_', '-');
+        
+        let notesHtml = '';
+        if (business.notes && business.notes.length > 0) {
+            const recentNotes = business.notes.slice(-2);
+            notesHtml = `
+                <div class="notes">
+                    ${recentNotes.map(note => `<div class="note">${this.escapeHtml(note)}</div>`).join('')}
+                </div>
+            `;
+        }
+        
+        card.innerHTML = `
+            <div class="business-header">
+                <h4>${this.escapeHtml(business.name)}</h4>
+                <span class="status-badge status-${statusClass}">${statusText}</span>
+            </div>
+            <div class="business-details">
+                ${business.status === 'meeting_scheduled' ? '<div class="detail meeting-detail"><i class="fas fa-handshake"></i><span>Ready to Meet!</span></div>' : ''}
+                ${business.phone ? `<div class="detail"><i class="fas fa-phone"></i><span>${this.escapeHtml(business.phone)}</span></div>` : ''}
+                ${business.email ? `<div class="detail"><i class="fas fa-envelope"></i><span>${this.escapeHtml(business.email)}</span></div>` : ''}
+                ${business.description ? `<div class="description">${this.escapeHtml(business.description.substring(0, 100))}${business.description.length > 100 ? '...' : ''}</div>` : ''}
+                ${notesHtml}
+            </div>
+            <div class="business-footer">
+                <small>${business.status === 'meeting_scheduled' ? 'Scheduled' : 'Updated'}: ${this.formatDateTime(business.updated_at)}</small>
+            </div>
+        `;
+        
+        return card;
+    }
+    
+    getColumnForStatus(status) {
+        const statusToAgent = {
+            'found': 'lead_finder',
+            'contacted': 'sdr',
+            'engaged': 'sdr',
+            'not_interested': 'sdr',
+            'no_response': 'sdr',
+            'converting': 'lead_manager',
+            'meeting_scheduled': 'calendar_assistant'
+        };
+        
+        const agentType = statusToAgent[status];
+        if (!agentType) return null;
+        
+        return document.querySelector(`[data-agent="${agentType}"]`);
+    }
+    
+    getAgentForStatus(status) {
+        const statusToAgent = {
+            'found': 'lead_finder',
+            'contacted': 'sdr',
+            'engaged': 'sdr',
+            'not_interested': 'sdr',
+            'no_response': 'sdr',
+            'converting': 'lead_manager',
+            'meeting_scheduled': 'calendar_assistant'
+        };
+        
+        return statusToAgent[status] || 'unknown';
+    }
+    
+    getStatusText(status) {
+        const statusTexts = {
+            'found': 'Found',
+            'contacted': 'Contacted',
+            'engaged': 'Engaged',
+            'not_interested': 'Not Interested',
+            'no_response': 'No Response',
+            'converting': 'Converting',
+            'meeting_scheduled': 'Meeting Scheduled'
+        };
+        
+        return statusTexts[status] || status;
+    }
+    
+    updateStats() {
+        const totalElement = document.getElementById('total-businesses');
+        const engagedElement = document.getElementById('engaged-count');
+        const convertingElement = document.getElementById('converting-count');
+        const meetingsElement = document.getElementById('meetings-count');
+        
+        if (!totalElement) return;
+        
+        let engaged = 0;
+        let converting = 0;
+        let meetings = 0;
+        
+        this.businesses.forEach(business => {
+            if (business.status === 'engaged') engaged++;
+            if (business.status === 'converting') converting++;
+            if (business.status === 'meeting_scheduled') meetings++;
+        });
+        
+        this.animateCounter(totalElement, this.businesses.size);
+        this.animateCounter(engagedElement, engaged);
+        this.animateCounter(convertingElement, converting);
+        this.animateCounter(meetingsElement, meetings);
+    }
+    
+    animateCounter(element, targetValue) {
+        const currentValue = parseInt(element.textContent) || 0;
+        if (currentValue === targetValue) return;
+        
+        const increment = targetValue > currentValue ? 1 : -1;
+        const duration = 300;
+        const steps = Math.abs(targetValue - currentValue);
+        const stepDuration = duration / steps;
+        
+        let current = currentValue;
+        const timer = setInterval(() => {
+            current += increment;
+            element.textContent = current;
+            
+            if (current === targetValue) {
+                clearInterval(timer);
+            }
+        }, stepDuration);
+    }
+    
+    updateAgentStatus(agentType, isActive) {
+        const statusElement = document.getElementById(`${agentType.replace('_', '-')}-status`);
+        if (!statusElement) return;
+        
+        const indicator = statusElement.querySelector('.status-indicator');
+        if (!indicator) return;
+        
+        indicator.className = `status-indicator ${isActive ? 'active' : 'idle'}`;
+    }
+    
+    updateAgentStatuses(isRunning) {
+        const agents = ['lead-finder', 'sdr', 'lead-manager', 'calendar'];
+        agents.forEach(agent => {
+            this.updateAgentStatus(agent.replace('-', '_'), isRunning);
+        });
+    }
+    
+    addActivityLogEntry(agent, message, timestamp) {
+        const logContent = document.getElementById('activity-log');
+        if (!logContent) return;
+        
+        const entry = document.createElement('div');
+        entry.className = 'log-entry';
+        entry.innerHTML = `
+            <span class="log-time">${this.formatDateTime(timestamp)}</span>
+            <span class="log-agent">${agent.replace('_', ' ')}</span>
+            <span class="log-message">${this.escapeHtml(message)}</span>
+        `;
+        
+        logContent.insertBefore(entry, logContent.firstChild);
+        
+        // Keep only last 50 entries
+        const entries = logContent.querySelectorAll('.log-entry');
+        if (entries.length > 50) {
+            entries[entries.length - 1].remove();
+        }
+    }
+    
+    clearAllBusinessCards() {
+        const contents = document.querySelectorAll('.column-content');
+        contents.forEach(content => {
+            content.innerHTML = '';
+        });
+    }
+    
+    showLoadingOverlay() {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            overlay.style.display = 'flex';
+        }
+    }
+    
+    hideLoadingOverlay() {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+    }
+    
+    showErrorToast(message) {
+        // Create toast notification
+        const toast = document.createElement('div');
+        toast.className = 'error-toast';
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #ef4444;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            z-index: 1001;
+            max-width: 400px;
+            font-weight: 500;
+        `;
+        toast.textContent = message;
+        
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.remove();
+        }, 5000);
+    }
+    
+    updateConnectionStatus(isConnected) {
+        // You can add visual feedback for connection status here
+        console.log(`Connection status: ${isConnected ? 'Connected' : 'Disconnected'}`);
+    }
+    
+    formatDateTime(dateTimeString) {
+        try {
+            const date = new Date(dateTimeString);
+            return date.toLocaleString();
+        } catch (error) {
+            return dateTimeString;
+        }
+    }
+    
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    initializeEventListeners() {
+        // Any additional event listeners can be added here
+    }
+}
+
+// Global functions
+function resetDashboard() {
+    if (confirm('Are you sure you want to reset the dashboard and start a new search?')) {
+        fetch('/reset', { method: 'POST' })
+            .then(response => {
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    console.error('Failed to reset dashboard');
+                }
+            })
+            .catch(error => {
+                console.error('Error resetting dashboard:', error);
+            });
+    }
+}
+
+function toggleLog() {
+    const logElement = document.querySelector('.activity-log');
+    const toggleButton = document.querySelector('.toggle-log i');
+    
+    if (logElement.classList.contains('collapsed')) {
+        logElement.classList.remove('collapsed');
+        toggleButton.className = 'fas fa-chevron-up';
+    } else {
+        logElement.classList.add('collapsed');
+        toggleButton.className = 'fas fa-chevron-down';
+    }
+}
+
+// Initialize dashboard when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Initializing dashboard...');
+    new DashboardManager();
+});
+
+// Handle page visibility changes to manage WebSocket connection
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+        console.log('Page hidden, WebSocket may be paused');
+    } else {
+        console.log('Page visible, ensuring WebSocket is connected');
+    }
+});
