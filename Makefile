@@ -4,6 +4,7 @@
 #   make deploy_local    - Deploy locally with environment variables
 #   make deploy_cloud    - Deploy to cloud with environment variables  
 #   make test_local      - Run local test (UI Client + Lead Manager only)
+#   make run_outreach_test_client - Start the Outreach Agent test web client on port 8501
 #   make clean           - Kill all running services
 #   make setup           - Install dependencies
 #   make help            - Show this help
@@ -19,7 +20,7 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 
-.PHONY: help deploy_local deploy_cloud test_local clean setup check_env
+.PHONY: help deploy_local deploy_cloud test_local clean setup check_env run_outreach_test_client
 
 help:
 	@echo "SalesShortcut A2A Project - Available Commands:"
@@ -30,6 +31,7 @@ help:
 	@echo "  make clean           - Kill all running services"
 	@echo "  make setup           - Install Python dependencies"
 	@echo "  make check_env       - Check environment variables"
+	@echo "  make run_outreach_test_client - Start the Outreach Agent test web client on port 8501"
 	@echo "  make help            - Show this help"
 	@echo ""
 	@echo "Environment Variables:"
@@ -76,6 +78,10 @@ test_local: clean check_env
 	 OPENAI_API_KEY="$(OPENAI_API_KEY)" \
 	 ANTHROPIC_API_KEY="$(ANTHROPIC_API_KEY)" \
 	 ./test_local.sh
+
+run_outreach_test_client:
+	@echo "🧪 Starting Outreach Agent Test Client on port 8501..."
+	@cd outreach/test_client && pip install -r requirements.txt && uvicorn app:app --reload --port 8501
 
 clean:
 	@echo "🧹 Stopping all services..."
