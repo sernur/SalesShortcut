@@ -78,7 +78,7 @@
                 <div class="column-content" id="lead-finder-content">
                     {% for business in businesses %}
                         {% if business.status == 'found' %}
-                        <div class="business-card" data-business-id="{{ business.id }}">
+                        <div class="business-card compact" data-business-id="{{ business.id }}">
                             <div class="business-header">
                                 <h4>{{ business.name }}</h4>
                                 <span class="status-badge status-found">Found</span>
@@ -88,24 +88,20 @@
                                     <i class="fas fa-map-marker-alt"></i>
                                     <span>{{ business.city }}</span>
                                 </div>
-                                {% if business.phone %}
-                                <div class="detail">
-                                    <i class="fas fa-phone"></i>
-                                    <span>{{ business.phone }}</span>
+                                <div class="contact-row">
+                                    {% if business.phone %}
+                                    <div class="contact-item">
+                                        <i class="fas fa-phone"></i>
+                                        <span>{{ business.phone }}</span>
+                                    </div>
+                                    {% endif %}
+                                    {% if business.email %}
+                                    <div class="contact-item">
+                                        <i class="fas fa-envelope"></i>
+                                        <span>{{ business.email[:20] }}{% if business.email|length > 20 %}...{% endif %}</span>
+                                    </div>
+                                    {% endif %}
                                 </div>
-                                {% endif %}
-                                {% if business.email %}
-                                <div class="detail">
-                                    <i class="fas fa-envelope"></i>
-                                    <span>{{ business.email }}</span>
-                                </div>
-                                {% endif %}
-                                {% if business.description %}
-                                <div class="description">{{ business.description[:100] }}...</div>
-                                {% endif %}
-                            </div>
-                            <div class="business-footer">
-                                <small>{{ business.created_at|format_datetime }}</small>
                             </div>
                         </div>
                         {% endif %}
@@ -131,7 +127,7 @@
                 <div class="column-content" id="sdr-content">
                     {% for business in businesses %}
                         {% if business.status in ['contacted', 'engaged', 'not_interested', 'no_response'] %}
-                        <div class="business-card" data-business-id="{{ business.id }}">
+                        <div class="business-card compact" data-business-id="{{ business.id }}">
                             <div class="business-header">
                                 <h4>{{ business.name }}</h4>
                                 <span class="status-badge status-{{ business.status.replace('_', '-') }}">
@@ -147,28 +143,26 @@
                                     <i class="fas fa-map-marker-alt"></i>
                                     <span>{{ business.city }}</span>
                                 </div>
-                                {% if business.phone %}
-                                <div class="detail">
-                                    <i class="fas fa-phone"></i>
-                                    <span>{{ business.phone }}</span>
+                                <div class="contact-row">
+                                    {% if business.phone %}
+                                    <div class="contact-item">
+                                        <i class="fas fa-phone"></i>
+                                        <span>{{ business.phone }}</span>
+                                    </div>
+                                    {% endif %}
+                                    {% if business.email %}
+                                    <div class="contact-item">
+                                        <i class="fas fa-envelope"></i>
+                                        <span>{{ business.email[:20] }}{% if business.email|length > 20 %}...{% endif %}</span>
+                                    </div>
+                                    {% endif %}
                                 </div>
-                                {% endif %}
-                                {% if business.email %}
-                                <div class="detail">
-                                    <i class="fas fa-envelope"></i>
-                                    <span>{{ business.email }}</span>
-                                </div>
-                                {% endif %}
                                 {% if business.notes %}
-                                <div class="notes">
-                                    {% for note in business.notes[-2:] %}
-                                    <div class="note">{{ note }}</div>
-                                    {% endfor %}
+                                <div class="compact-notes">
+                                    <i class="fas fa-sticky-note"></i>
+                                    <span>{{ business.notes[-1][:50] }}{% if business.notes[-1]|length > 50 %}...{% endif %}</span>
                                 </div>
                                 {% endif %}
-                            </div>
-                            <div class="business-footer">
-                                <small>Updated: {{ business.updated_at|format_datetime }}</small>
                             </div>
                         </div>
                         {% endif %}
@@ -194,42 +188,39 @@
                 <div class="column-content" id="lead-manager-content">
                     {% for business in businesses %}
                         {% if business.status == 'converting' %}
-                        <div class="business-card" data-business-id="{{ business.id }}">
+                        <div class="business-card compact hot-lead" data-business-id="{{ business.id }}">
                             <div class="business-header">
-                                <h4>{{ business.name }}</h4>
+                                <div class="business-title">
+                                    <i class="fas fa-fire hot-icon"></i>
+                                    <h4>{{ business.name }}</h4>
+                                </div>
                                 <span class="status-badge status-converting">Converting</span>
                             </div>
                             <div class="business-details">
                                 <div class="detail">
-                                    <i class="fas fa-fire"></i>
-                                    <span>Hot Lead</span>
-                                </div>
-                                <div class="detail">
                                     <i class="fas fa-map-marker-alt"></i>
                                     <span>{{ business.city }}</span>
                                 </div>
-                                {% if business.phone %}
-                                <div class="detail">
-                                    <i class="fas fa-phone"></i>
-                                    <span>{{ business.phone }}</span>
+                                <div class="contact-row">
+                                    {% if business.phone %}
+                                    <div class="contact-item">
+                                        <i class="fas fa-phone"></i>
+                                        <span>{{ business.phone }}</span>
+                                    </div>
+                                    {% endif %}
+                                    {% if business.email %}
+                                    <div class="contact-item">
+                                        <i class="fas fa-envelope"></i>
+                                        <span>{{ business.email[:20] }}{% if business.email|length > 20 %}...{% endif %}</span>
+                                    </div>
+                                    {% endif %}
                                 </div>
-                                {% endif %}
-                                {% if business.email %}
-                                <div class="detail">
-                                    <i class="fas fa-envelope"></i>
-                                    <span>{{ business.email }}</span>
-                                </div>
-                                {% endif %}
                                 {% if business.notes %}
-                                <div class="notes">
-                                    {% for note in business.notes[-2:] %}
-                                    <div class="note">{{ note }}</div>
-                                    {% endfor %}
+                                <div class="compact-notes">
+                                    <i class="fas fa-sticky-note"></i>
+                                    <span>{{ business.notes[-1][:50] }}{% if business.notes[-1]|length > 50 %}...{% endif %}</span>
                                 </div>
                                 {% endif %}
-                            </div>
-                            <div class="business-footer">
-                                <small>Converting since: {{ business.updated_at|format_datetime }}</small>
                             </div>
                         </div>
                         {% endif %}
@@ -255,42 +246,39 @@
                 <div class="column-content" id="calendar-content">
                     {% for business in businesses %}
                         {% if business.status == 'meeting_scheduled' %}
-                        <div class="business-card meeting-card" data-business-id="{{ business.id }}">
+                        <div class="business-card compact meeting-card" data-business-id="{{ business.id }}">
                             <div class="business-header">
-                                <h4>{{ business.name }}</h4>
-                                <span class="status-badge status-meeting">Meeting Scheduled</span>
+                                <div class="business-title">
+                                    <i class="fas fa-handshake meeting-icon"></i>
+                                    <h4>{{ business.name }}</h4>
+                                </div>
+                                <span class="status-badge status-meeting">Meeting</span>
                             </div>
                             <div class="business-details">
-                                <div class="detail meeting-detail">
-                                    <i class="fas fa-handshake"></i>
-                                    <span>Ready to Meet!</span>
-                                </div>
                                 <div class="detail">
                                     <i class="fas fa-map-marker-alt"></i>
                                     <span>{{ business.city }}</span>
                                 </div>
-                                {% if business.phone %}
-                                <div class="detail">
-                                    <i class="fas fa-phone"></i>
-                                    <span>{{ business.phone }}</span>
+                                <div class="contact-row">
+                                    {% if business.phone %}
+                                    <div class="contact-item">
+                                        <i class="fas fa-phone"></i>
+                                        <span>{{ business.phone }}</span>
+                                    </div>
+                                    {% endif %}
+                                    {% if business.email %}
+                                    <div class="contact-item">
+                                        <i class="fas fa-envelope"></i>
+                                        <span>{{ business.email[:20] }}{% if business.email|length > 20 %}...{% endif %}</span>
+                                    </div>
+                                    {% endif %}
                                 </div>
-                                {% endif %}
-                                {% if business.email %}
-                                <div class="detail">
-                                    <i class="fas fa-envelope"></i>
-                                    <span>{{ business.email }}</span>
-                                </div>
-                                {% endif %}
                                 {% if business.notes %}
-                                <div class="notes">
-                                    {% for note in business.notes[-2:] %}
-                                    <div class="note">{{ note }}</div>
-                                    {% endfor %}
+                                <div class="compact-notes">
+                                    <i class="fas fa-calendar-check"></i>
+                                    <span>{{ business.notes[-1][:50] }}{% if business.notes[-1]|length > 50 %}...{% endif %}</span>
                                 </div>
                                 {% endif %}
-                            </div>
-                            <div class="business-footer">
-                                <small>Scheduled: {{ business.updated_at|format_datetime }}</small>
                             </div>
                         </div>
                         {% endif %}
