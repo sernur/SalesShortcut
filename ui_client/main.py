@@ -204,7 +204,6 @@ async def call_lead_finder_agent_a2a(city: str, session_id: str) -> dict[str, An
             
             search_data = {
                 "city": city,
-                "max_results": 50,  # Configurable
             }
             
             sdk_message = A2AMessage(
@@ -561,7 +560,7 @@ async def run_lead_finding_process(city: str, session_id: str):
         
         if result["success"]:
             business_logger.info(f"Lead Finder returned {len(result['businesses'])} businesses")
-            await process_lead_finder_results(result["businesses"], city)
+            # await process_lead_finder_results(result["businesses"], city)
             
             # Send completion update
             await manager.send_update({
