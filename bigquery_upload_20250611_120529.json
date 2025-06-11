@@ -1,0 +1,38 @@
+{
+  "timestamp": "2025-06-11T12:05:29.194019",
+  "record_count": 4,
+  "data": [
+    {
+      "address": "123 Main St, Huyynya, State, 12345",
+      "category": "Restaurant",
+      "website": "https://www.business1.com",
+      "phone": "555-123-4567",
+      "name": "Business G1 in Huyynya",
+      "rating": 4.5
+    },
+    {
+      "website": "https://www.business2.com",
+      "name": "Business G2 in Huyynya",
+      "rating": 4.2,
+      "phone": "555-987-6543",
+      "category": "Retail",
+      "address": "456 Oak Ave, Huyynya, State, 12345"
+    },
+    {
+      "website": "https://www.business3.com",
+      "category": "Professional Services",
+      "name": "Business 3 in Huyynya",
+      "phone": "555-456-7890",
+      "established": 2010,
+      "address": "789 Pine St, Huyynya, State, 12345"
+    },
+    {
+      "address": "321 Maple Rd, Huyynya, State, 12345",
+      "name": "Business 4 in Huyynya",
+      "website": "https://www.business4.com",
+      "category": "Healthcare",
+      "phone": "555-789-0123",
+      "established": 2015
+    }
+  ]
+}

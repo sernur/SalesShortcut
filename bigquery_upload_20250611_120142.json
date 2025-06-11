@@ -1,0 +1,38 @@
+{
+  "timestamp": "2025-06-11T12:01:42.892411",
+  "record_count": 4,
+  "data": [
+    {
+      "phone": "555-123-4567",
+      "website": "https://www.business1.com",
+      "name": "Business G1 in Popalis",
+      "category": "Restaurant",
+      "address": "123 Main St, Popalis, State, 12345",
+      "rating": 4.5
+    },
+    {
+      "address": "456 Oak Ave, Popalis, State, 12345",
+      "phone": "555-987-6543",
+      "website": "https://www.business2.com",
+      "name": "Business G2 in Popalis",
+      "rating": 4.2,
+      "category": "Retail"
+    },
+    {
+      "website": "https://www.business3.com",
+      "address": "789 Pine St, Popalis, State, 12345",
+      "name": "Business 3 in Popalis",
+      "phone": "555-456-7890",
+      "established": 2010,
+      "category": "Professional Services"
+    },
+    {
+      "name": "Business 4 in Popalis",
+      "website": "https://www.business4.com",
+      "address": "321 Maple Rd, Popalis, State, 12345",
+      "category": "Healthcare",
+      "established": 2015,
+      "phone": "555-789-0123"
+    }
+  ]
+}

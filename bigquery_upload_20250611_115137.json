@@ -1,0 +1,38 @@
+{
+  "timestamp": "2025-06-11T11:51:37.345184",
+  "record_count": 4,
+  "data": [
+    {
+      "name": "Business G1 in Ashgabat",
+      "website": "https://www.business1.com",
+      "phone": "555-123-4567",
+      "address": "123 Main St, Ashgabat, State, 12345",
+      "rating": 4.5,
+      "category": "Restaurant"
+    },
+    {
+      "phone": "555-987-6543",
+      "name": "Business G2 in Ashgabat",
+      "address": "456 Oak Ave, Ashgabat, State, 12345",
+      "category": "Retail",
+      "website": "https://www.business2.com",
+      "rating": 4.2
+    },
+    {
+      "address": "789 Pine St, Ashgabat, State, 12345",
+      "phone": "555-456-7890",
+      "established": 2010,
+      "category": "Professional Services",
+      "website": "https://www.business3.com",
+      "name": "Business 3 in Ashgabat"
+    },
+    {
+      "category": "Healthcare",
+      "established": 2015,
+      "name": "Business 4 in Ashgabat",
+      "address": "321 Maple Rd, Ashgabat, State, 12345",
+      "website": "https://www.business4.com",
+      "phone": "555-789-0123"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+{
+  "timestamp": "2025-06-11T11:33:51.243285",
+  "record_count": 4,
+  "data": [
+    {
+      "address": "123 Main St, Kukolon, State, 12345",
+      "category": "Restaurant",
+      "phone": "555-123-4567",
+      "website": "https://www.business1.com",
+      "name": "Business G1 in Kukolon",
+      "rating": 4.5
+    },
+    {
+      "rating": 4.2,
+      "phone": "555-987-6543",
+      "category": "Retail",
+      "address": "456 Oak Ave, Kukolon, State, 12345",
+      "website": "https://www.business2.com",
+      "name": "Business G2 in Kukolon"
+    },
+    {
+      "phone": "555-456-7890",
+      "name": "Business 3 in Kukolon",
+      "established": 2010,
+      "address": "789 Pine St, Kukolon, State, 12345",
+      "category": "Professional Services",
+      "website": "https://www.business3.com"
+    },
+    {
+      "phone": "555-789-0123",
+      "address": "321 Maple Rd, Kukolon, State, 12345",
+      "category": "Healthcare",
+      "name": "Business 4 in Kukolon",
+      "website": "https://www.business4.com",
+      "established": 2015
+    }
+  ]
+}
