@@ -2,12 +2,12 @@
 MergerAgent implementation.
 """
 
-from google.adk.agents.llm_agent import Agent
+from google.adk.agents import LlmAgent 
 from ..config import MODEL
 from ..prompts import MERGER_AGENT_PROMPT
 from ..tools.bigquery_utils import bigquery_upload_tool
 
-merger_agent = Agent(
+merger_agent = LlmAgent(
     model=MODEL,
     name="MergerAgent",
     description="Agent for processing and merging business data",
