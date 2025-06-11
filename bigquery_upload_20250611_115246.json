@@ -1,0 +1,38 @@
+{
+  "timestamp": "2025-06-11T11:52:46.778596",
+  "record_count": 4,
+  "data": [
+    {
+      "phone": "555-123-4567",
+      "category": "Restaurant",
+      "rating": 4.5,
+      "address": "123 Main St, Askabar, State, 12345",
+      "website": "https://www.business1.com",
+      "name": "Business G1 in Askabar"
+    },
+    {
+      "address": "456 Oak Ave, Askabar, State, 12345",
+      "name": "Business G2 in Askabar",
+      "rating": 4.2,
+      "category": "Retail",
+      "phone": "555-987-6543",
+      "website": "https://www.business2.com"
+    },
+    {
+      "category": "Professional Services",
+      "established": 2010,
+      "website": "https://www.business3.com",
+      "address": "789 Pine St, Askabar, State, 12345",
+      "phone": "555-456-7890",
+      "name": "Business 3 in Askabar"
+    },
+    {
+      "phone": "555-789-0123",
+      "name": "Business 4 in Askabar",
+      "address": "321 Maple Rd, Askabar, State, 12345",
+      "website": "https://www.business4.com",
+      "established": 2015,
+      "category": "Healthcare"
+    }
+  ]
+}

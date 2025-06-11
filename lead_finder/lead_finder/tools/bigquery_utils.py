@@ -1,13 +1,31 @@
 """
 BigQuery utility tools.
 """
+import json
+import asyncio
+from datetime import datetime
+from pathlib import Path
 
 from typing import Dict, Any, List
 from google.adk.tools import FunctionTool
 from google.cloud import bigquery
 from ..config import PROJECT, DATASET_ID, TABLE_ID
 
-def bigquery_upload(data: List[dict[str, Any]]) -> dict[str, Any]:
+
+# Temporary mock function to simulate BigQuery upload
+def _write_json_file(filepath: Path, data: List[Dict[str, Any]]) -> None:
+    """Helper function to write JSON data to file."""
+    output_data = {
+        "timestamp": datetime.now().isoformat(),
+        "record_count": len(data),
+        "data": data
+    }
+    
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(output_data, f, indent=2, ensure_ascii=False)
+
+
+async def bigquery_upload(data: List[dict[str, Any]]) -> dict[str, Any]:
     """
     BigQuery upload tool.
     
@@ -17,48 +35,22 @@ def bigquery_upload(data: List[dict[str, Any]]) -> dict[str, Any]:
     Returns:
         A dictionary containing upload status
     """
-    if not PROJECT:
-        # Mock response for development or when project is not available
-        num_records = len(data)
-        return {
-            "status": "success", 
-            "message": f"[MOCK] Successfully uploaded {num_records} business records to BigQuery",
-            "records_processed": num_records
-        }
+    
+    num_records = len(data)
+    
+    # Create output file in current directory
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"bigquery_upload_{timestamp}.json"
+    filepath = Path(filename)
     
     try:
-        # Create a BigQuery client
-        client = bigquery.Client(project=PROJECT)
+        await asyncio.to_thread(_write_json_file, filepath, data)
         
-        # Get the table reference
-        table_ref = client.dataset(DATASET_ID).table(TABLE_ID)
-        
-        # Load the data into BigQuery
-        job_config = bigquery.LoadJobConfig()
-        job_config.source_format = bigquery.SourceFormat.NEWLINE_DELIMITED_JSON
-        job_config.autodetect = True
-        
-        # Convert data to newline-delimited JSON
-        job = client.load_table_from_json(
-            data,
-            table_ref,
-            job_config=job_config
-        )
-        
-        # Wait for the job to complete
-        job.result()
-        
-        # Return the result
-        return {
-            "status": "success",
-            "message": f"Successfully uploaded {len(data)} business records to BigQuery table {DATASET_ID}.{TABLE_ID}",
-            "records_processed": len(data)
-        }
-    
+        return data
     except Exception as e:
         return {
             "status": "error",
-            "message": f"Error uploading data to BigQuery: {str(e)}"
+            "message": f"Error writing mock data to file: {str(e)}"
         }
-
+            
 bigquery_upload_tool = FunctionTool(func=bigquery_upload)

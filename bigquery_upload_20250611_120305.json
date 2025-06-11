@@ -1,0 +1,38 @@
+{
+  "timestamp": "2025-06-11T12:03:05.960527",
+  "record_count": 4,
+  "data": [
+    {
+      "name": "Business 3 in Kushda",
+      "website": "https://www.business3.com",
+      "address": "789 Pine St, Kushda, State, 12345",
+      "phone": "555-456-7890",
+      "category": "Professional Services",
+      "established": 2010
+    },
+    {
+      "website": "https://www.business4.com",
+      "address": "321 Maple Rd, Kushda, State, 12345",
+      "category": "Healthcare",
+      "name": "Business 4 in Kushda",
+      "phone": "555-789-0123",
+      "established": 2015
+    },
+    {
+      "category": "Restaurant",
+      "address": "123 Main St, Kushda, State, 12345",
+      "phone": "555-123-4567",
+      "name": "Business G1 in Kushda",
+      "website": "https://www.business1.com",
+      "rating": 4.5
+    },
+    {
+      "phone": "555-987-6543",
+      "website": "https://www.business2.com",
+      "category": "Retail",
+      "name": "Business G2 in Kushda",
+      "address": "456 Oak Ave, Kushda, State, 12345",
+      "rating": 4.2
+    }
+  ]
+}

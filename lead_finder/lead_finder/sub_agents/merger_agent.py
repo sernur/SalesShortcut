@@ -13,4 +13,5 @@ merger_agent = LlmAgent(
     description="Agent for processing and merging business data",
     instruction=MERGER_AGENT_PROMPT,
     tools=[bigquery_upload_tool],
+    output_key="final_merged_leads", 
 )
