@@ -8,7 +8,7 @@ from a2a.server.tasks import TaskUpdater
 from a2a.types import DataPart, Part, TaskState
 
 # Make sure you have a shared config for the artifact name
-from common.config import DEFAULT_LEAD_FINDER_ARTIFACT_NAME
+from common.config import DEFAULT_LEAD_FINDER_ARTIFACT_NAME, DEFAULT_UI_CLIENT_URL
 from google.adk import Runner
 from google.adk.sessions import InMemorySessionService, Session
 from google.genai import types as genai_types
@@ -32,6 +32,8 @@ class LeadFinderAgentExecutor(AgentExecutor):
 
     async def execute(self, context: RequestContext, event_queue: EventQueue):
         task_updater = TaskUpdater(event_queue, context.task_id, context.context_id)
+        
+        logger.info(f"DEBUG: Context message parts: {[str(part) for part in context.message.parts]}")
 
         if not context.current_task:
             task_updater.submit(message=context.message)
@@ -39,99 +41,141 @@ class LeadFinderAgentExecutor(AgentExecutor):
         task_updater.start_work(
             message=task_updater.new_agent_message(
                 parts=[
-                    Part(root=DataPart(data={"status": "Processing city search..."}))
+                    Part(root=DataPart(data={"status": "Processing city search request..."}))
                 ]
             )
         )
 
-        city: str | None = None
+        # Extract city from context.message - IMPROVED EXTRACTION
+        city_name: str | None = None
+        ui_client_url = DEFAULT_UI_CLIENT_URL
+
         if context.message and context.message.parts:
             for part_union in context.message.parts:
                 part = part_union.root
-                if isinstance(part, DataPart) and "city" in part.data:
-                    city = part.data.get("city")
-                    break
+                if isinstance(part, DataPart):
+                    # Try multiple keys for city
+                    if "city" in part.data:
+                        city_name = part.data["city"]
+                    elif "query" in part.data:
+                        city_name = part.data["query"]  # Assuming query contains city
+                    elif "search_query" in part.data:
+                        city_name = part.data["search_query"]
+                    
+                    if "ui_client_url" in part.data:
+                        ui_client_url = part.data["ui_client_url"]
 
-        if not city:
-            logger.error(f"Task {context.task_id}: Missing 'city' in input data")
+        if city_name is None:
+            logger.error(f"Task {context.task_id}: Missing city name in input")
             task_updater.failed(
                 message=task_updater.new_agent_message(
-                    parts=[Part(root=DataPart(data={"error": "Invalid input: Missing city"}))]
+                    parts=[
+                        Part(
+                            root=DataPart(
+                                data={"error": "Invalid input: Missing city name"}
+                            )
+                        )
+                    ]
                 )
             )
             return
 
-        agent_input_data = {"city": city}
-        agent_input_json = json.dumps(agent_input_data)
+        # Prepare input for ADK Agent with clear structure
+        agent_input_dict = {
+            "city": city_name,
+            "ui_client_url": ui_client_url,
+            "operation": "find_leads"
+        }
+        
+        # Create a clear user message for the agent
+        user_message = f"Find potential business leads in {city_name}"
+        
+        # Create both text and structured data
         adk_content = genai_types.Content(
-            parts=[genai_types.Part(text=agent_input_json)]
+            parts=[
+                genai_types.Part(text=user_message),
+                genai_types.Part(text=json.dumps(agent_input_dict))
+            ]
         )
 
-        # Session management (as you had it)
-        session: Session | None = await self._adk_runner.session_service.get_session(
-            app_name=self._adk_runner.app_name,
-            user_id="a2a_user",
-            session_id=context.context_id,
-        )
-        if session is None:
-            logger.info(f"Task {context.task_id}: Creating new ADK session for '{context.context_id}'.")
-            session = await self._adk_runner.session_service.create_session(
-                app_name=self._adk_runner.app_name,
-                user_id="a2a_user",
-                session_id=context.context_id,
-                state={}
-            )
+        # [Rest of the session handling code remains the same...]
+        session_id_for_adk = context.context_id
+        logger.info(f"Task {context.task_id}: Using ADK session_id: '{session_id_for_adk}' for city: '{city_name}'")
+
+        session: Session | None = None
+        if session_id_for_adk:
+            try:
+                session = await self._adk_runner.session_service.get_session(
+                    app_name=self._adk_runner.app_name,
+                    user_id="a2a_user",
+                    session_id=session_id_for_adk,
+                )
+            except Exception as e:
+                logger.exception(f"Task {context.task_id}: Exception during get_session: {e}")
+                session = None
+
+            if not session:
+                logger.info(f"Task {context.task_id}: Creating new ADK session for city: {city_name}")
+                try:
+                    session = await self._adk_runner.session_service.create_session(
+                        app_name=self._adk_runner.app_name,
+                        user_id="a2a_user",
+                        session_id=session_id_for_adk,
+                        state={"city": city_name},  # Store city in session state
+                    )
+                    if session:
+                        logger.info(f"Task {context.task_id}: Successfully created ADK session with city: {city_name}")
+                except Exception as e:
+                    logger.exception(f"Task {context.task_id}: Exception during create_session: {e}")
+                    session = None
 
         if not session:
-            error_message = f"Failed to establish ADK session for '{context.context_id}'."
+            error_message = f"Failed to establish ADK session for city '{city_name}'"
             logger.error(f"Task {context.task_id}: {error_message}")
             task_updater.failed(
                 message=task_updater.new_agent_message(
-                    parts=[Part(root=DataPart(data={"error": f"Internal error: {error_message}"}))]
+                    parts=[
+                        Part(
+                            root=DataPart(
+                                data={"error": f"Internal error: {error_message}"}
+                            )
+                        )
+                    ]
                 )
             )
             return
 
-        final_businesses: list = []
-        
+        # Execute the ADK Agent
         try:
-            logger.info(f"Running LeadFinderAgent for city: '{city}'")
+            logger.info(f"Task {context.task_id}: Calling ADK run_async for city: {city_name}")
+            final_result = {"status": "completed", "city": city_name, "businesses": []}
+            
             async for event in self._adk_runner.run_async(
                 user_id="a2a_user",
-                session_id=context.context_id,
+                session_id=session_id_for_adk,
                 new_message=adk_content,
             ):
-                # --- THIS IS THE KEY CHANGE ---
-                # We are now looking for the 'function_call' produced by our `post_results_callback`.
-                if event.content and event.content.parts:
-                    first_part = event.content.parts[0]
-                    if (
-                        hasattr(first_part, "function_call")
-                        and first_part.function_call
-                        and first_part.function_call.name == "final_lead_results" # The name we defined in the callback
-                    ):
-                        # The callback has given us the final, clean data
-                        args = first_part.function_call.args
-                        if isinstance(args, dict):
-                            final_businesses = args.get("businesses", [])
-                            logger.info(f"Executor received {len(final_businesses)} businesses from the agent callback.")
-                            # Since this is the definitive final result, we can break.
-                            break
+                if event.is_final_response():
+                    if event.content and event.content.parts:
+                        # Look for function calls with business data
+                        for part in event.content.parts:
+                            if hasattr(part, 'function_call') and part.function_call:
+                                if part.function_call.name == "final_lead_results":
+                                    businesses = part.function_call.args.get("businesses", [])
+                                    final_result["businesses"] = businesses
+                                    final_result["count"] = len(businesses)
+                                    logger.info(f"Task {context.task_id}: Found {len(businesses)} businesses for {city_name}")
+                            elif hasattr(part, "text") and part.text:
+                                final_result["message"] = part.text
 
-            # The rest of the logic is the same as before.
-            # It adds the artifact (which can be an empty list) and completes the task.
             task_updater.add_artifact(
-                parts=[Part(root=DataPart(data={"businesses": final_businesses}))],
-                name=DEFAULT_LEAD_FINDER_ARTIFACT_NAME,
+                parts=[Part(root=DataPart(data=final_result))],
+                name="lead_search_results",
             )
             task_updater.complete()
-            logger.info(f"Task {context.task_id} completed successfully.")
 
         except Exception as e:
-            logger.error(
-                f"Error running LeadFinder ADK agent for task {context.task_id}: {e}",
-                exc_info=True,
-            )
+            logger.exception(f"Task {context.task_id}: Error running Lead Finder ADK agent for city {city_name}: {e}")
             task_updater.failed(
                 message=task_updater.new_agent_message(
                     parts=[Part(root=DataPart(data={"error": f"ADK Agent error: {e}"}))]
@@ -139,6 +183,10 @@ class LeadFinderAgentExecutor(AgentExecutor):
             )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue):
-        logger.warning(
-            f"Cancellation not implemented for LeadFinder ADK agent task: {context.task_id}"
+        logger.warning(f"Cancellation not implemented for Lead Finder task: {context.task_id}")
+        task_updater = TaskUpdater(event_queue, context.task_id, context.context_id)
+        task_updater.failed(
+            message=task_updater.new_agent_message(
+                parts=[Part(root=DataPart(data={"error": "Task cancelled"}))]
+            )
         )

@@ -3,16 +3,14 @@ Custom cluster search tool implementation.
 """
 
 from typing import Dict, Any, List
-from google.adk.tools import ToolContext
+from google.adk.tools import FunctionTool
 
-def cluster_search(city: str, tool_context: ToolContext) -> dict[str, Any]:
+def cluster_search(city: str) -> dict[str, Any]:
     """
     Implementation of custom cluster search for businesses in a specified city.
-    
     Args:
         city: The name of the city to search in
-        tool_context: The tool context from ADK
-        
+
     Returns:
         A dictionary containing search results
     """
@@ -37,3 +35,5 @@ def cluster_search(city: str, tool_context: ToolContext) -> dict[str, Any]:
     ]
     
     return {"status": "success", "results": mock_results}
+
+cluster_search_tool = FunctionTool(func=cluster_search)   
