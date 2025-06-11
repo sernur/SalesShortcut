@@ -103,6 +103,12 @@ class DashboardManager {
             case 'lead_finding_failed':
                 this.handleLeadFindingFailed(data);
                 break;
+            case 'lead_finding_empty':
+                this.handleLeadFindingEmpty(data);
+                break;
+            case 'process_finished':
+                this.handleProcessFinished(data);
+                break;
             case 'state_reset':
                 this.handleStateReset(data);
                 break;
@@ -191,6 +197,17 @@ class DashboardManager {
         this.updateAgentStatus('lead_finder', false);
         this.addActivityLogEntry('lead_finder', `Error: ${data.error}`, data.timestamp);
         this.showErrorToast(data.error);
+    }
+    
+    handleLeadFindingEmpty(data) {
+        console.log('Lead finding empty:', data);
+        this.addActivityLogEntry('lead_finder', data.message, data.timestamp);
+        // No error toast for empty results - this is normal behavior
+    }
+    
+    handleProcessFinished(data) {
+        console.log('Process finished:', data);
+        // Any final cleanup can be done here
     }
     
     handleStateReset(data) {

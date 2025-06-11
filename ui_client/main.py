@@ -269,11 +269,14 @@ async def call_lead_finder_agent_a2a(city: str, session_id: str) -> dict[str, An
                         else:
                             business_logger.warning(f"Unexpected artifact part type: {type(art_part_root)}")
                     else:
-                        business_logger.warning("Lead results artifact not found or empty")
-                        outcome["error"] = "No lead results returned"
+                        business_logger.info("Lead results artifact not found or empty - checking for empty results")
+                        # Don't set this as an error immediately, let the success flow handle empty results
+                        outcome["success"] = True
+                        outcome["businesses"] = []
                 else:
-                    business_logger.warning("No artifacts found in Lead Finder response")
-                    outcome["error"] = "No artifacts in response"
+                    business_logger.info("No artifacts found in Lead Finder response - treating as empty results")
+                    outcome["success"] = True
+                    outcome["businesses"] = []
             else:
                 business_logger.error(f"Invalid A2A response type: {type(root_response_part)}")
                 outcome["error"] = "Invalid response type"
@@ -390,14 +393,21 @@ async def run_lead_finding_process(city: str, session_id: str):
             found_businesses = result.get("businesses", [])
             business_logger.info(f"Lead Finder returned {len(found_businesses)} businesses")
 
-            # --- This is the key change ---
+            # Send completion update regardless of whether businesses were found
+            await manager.send_update({
+                "type": "lead_finding_completed",
+                "city": city,
+                "business_count": len(found_businesses),
+                "timestamp": datetime.now().isoformat(),
+            })
+            
             # Check if the returned list is empty
             if not found_businesses:
                 business_logger.info(f"No businesses found for city: {city}. Notifying UI.")
                 await manager.send_update({
                     "type": "lead_finding_empty",
                     "city": city,
-                    "message": "Nothing found, try another city.",
+                    "message": "No businesses found for this city. Try another city.",
                     "timestamp": datetime.now().isoformat(),
                 })
             
@@ -586,45 +596,6 @@ async def start_lead_finding(city: str = Form(...)):
             content={"error": f"Failed to start process: {e}"}
         )
 
-async def run_lead_finding_process(city: str, session_id: str):
-    """Run the complete lead finding process."""
-    business_logger = logging.getLogger(BUSINESS_LOGIC_LOGGER)
-    
-    try:
-        business_logger.info(f"Starting lead finding process for {city}")
-        
-        # Call Lead Finder agent
-        result = await call_lead_finder_agent(city, session_id)
-        
-        if result["success"]:
-            business_logger.info(f"Lead Finder returned {len(result['businesses'])} businesses")
-            # await process_lead_finder_results(result["businesses"], city)
-            
-            # Send completion update
-            await manager.send_update({
-                "type": "lead_finding_completed",
-                "city": city,
-                "business_count": len(result["businesses"]),
-                "timestamp": datetime.now().isoformat(),
-            })
-        else:
-            business_logger.error(f"Lead finding failed: {result['error']}")
-            await manager.send_update({
-                "type": "lead_finding_failed",
-                "error": result["error"],
-                "timestamp": datetime.now().isoformat(),
-            })
-    
-    except Exception as e:
-        business_logger.error(f"Error in lead finding process: {e}", exc_info=True)
-        await manager.send_update({
-            "type": "lead_finding_failed",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat(),
-        })
-    
-    finally:
-        app_state["is_running"] = False
 
 @app.get("/api/businesses")
 async def get_businesses():
