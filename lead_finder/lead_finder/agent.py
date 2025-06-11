@@ -14,7 +14,7 @@ lead_finder_agent = SequentialAgent(
     name="LeadFinderAgent",
     description="Sequential agent for finding business leads in a specified city",
     sub_agents=[potential_lead_finder_agent, merger_agent],
-    after_agent_callback=post_results_callback_test,
+    after_agent_callback=post_results_callback,
 )
 
 root_agent = lead_finder_agent

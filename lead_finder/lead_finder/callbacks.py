@@ -50,41 +50,34 @@ def send_update_to_ui(business_data: dict):
 
 
 def post_results_callback(callback_context: CallbackContext) -> Optional[genai_types.Content]:
-    """
-    This callback runs after the root lead_finder_agent completes.
-    It intercepts the final output, packages it, sends direct HTTP callbacks
-    to the UI for each business, and returns the final result for the A2A task.
-    """
     agent_name = callback_context.agent_name
     logger.info(f"[Callback] Exiting agent: {agent_name}. Processing final result.")
-    
-    print(f"DEBUG: Available attributes in callback_context are: {dir(callback_context)}")
-    
-    invocation_result = callback_context.invocation_result
-    final_businesses = []
 
-    if (
-        invocation_result
-        and invocation_result.parts
-        and hasattr(invocation_result.parts[0], "function_response")
-    ):
-        function_response = invocation_result.parts[0].function_response
-        # Correctly check for the tool/function name from your merger agent
-        if function_response.name == "save_merged_leads":
-            response_data = function_response.response
-            if isinstance(response_data, dict):
-                final_businesses = response_data.get("businesses", [])
-                logger.info(f"[Callback] Extracted {len(final_businesses)} businesses from agent's final tool call.")
+    invocation_result = callback_context.user_content          # still correct
+    final_businesses: list[dict] = []
 
-    if not final_businesses:
-        logger.warning("[Callback] Agent did not produce a final list of businesses. No direct UI callbacks will be sent.")
-    else:
-        send_update_to_ui(final_businesses)
+    if invocation_result and invocation_result.parts:
+        part0 = invocation_result.parts[0]
 
-    # --- A2A Task Result Logic ---
-    # We still return the final content for the A2A task, as this is best practice.
-    # It provides a primary, reliable way to get the full results list.
-    final_output_content = genai_types.Content(
+        # Safely get the function_response (may be None)
+        fn_resp = getattr(part0, "function_response", None)
+        if fn_resp and fn_resp.name == "save_merged_leads":
+            data = fn_resp.response or {}
+            final_businesses = data.get("businesses", [])
+        else:
+            logger.warning(
+                "[Callback] No tool call in final content – "
+                "agent likely exited without merging leads. "
+                "Raw content: %s", invocation_result
+            )
+
+    # ---------- notify UI ----------
+    for biz in final_businesses:
+        send_update_to_ui(biz)
+
+    # ---------- return artifact for the A2A task ----------
+    return genai_types.Content(
+        role="model",
         parts=[
             genai_types.Part(
                 function_call=genai_types.FunctionCall(
@@ -93,11 +86,7 @@ def post_results_callback(callback_context: CallbackContext) -> Optional[genai_t
                 )
             )
         ],
-        role="model",
     )
-
-    logger.info("[Callback] Returning new Content object for the A2A task artifact.")
-    return final_output_content
 
 
 async def post_results_callback_test(callback_context: CallbackContext) -> Optional[genai_types.Content]:
