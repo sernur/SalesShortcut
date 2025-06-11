@@ -145,10 +145,16 @@ class DashboardManager {
         const oldBusiness = this.businesses.get(data.business.id);
         this.businesses.set(data.business.id, data.business);
         
-        // Move business card to appropriate column if status changed
-        if (oldBusiness && oldBusiness.status !== data.business.status) {
+        if (!oldBusiness) {
+            // This is a new business, create a new card
+            console.log('Creating new business card for:', data.business.name);
+            this.addBusinessCard(data.business, data.agent);
+        } else if (oldBusiness.status !== data.business.status) {
+            // Status changed, move the card
+            console.log('Moving business card due to status change:', data.business.name);
             this.moveBusinessCard(data.business, oldBusiness.status, data.business.status);
         } else {
+            // Update existing card
             this.updateBusinessCard(data.business);
         }
         
@@ -256,38 +262,75 @@ class DashboardManager {
     
     createBusinessCard(business) {
         const card = document.createElement('div');
-        card.className = `business-card ${business.status === 'meeting_scheduled' ? 'meeting-card' : ''}`;
+        const isHotLead = business.status === 'converting';
+        const isMeeting = business.status === 'meeting_scheduled';
+        
+        card.className = `business-card compact ${isMeeting ? 'meeting-card' : ''} ${isHotLead ? 'hot-lead' : ''}`;
         card.setAttribute('data-business-id', business.id);
         
         const statusText = this.getStatusText(business.status);
         const statusClass = business.status.replace('_', '-');
         
-        let notesHtml = '';
+        // Create compact notes if available
+        let compactNotesHtml = '';
         if (business.notes && business.notes.length > 0) {
-            const recentNotes = business.notes.slice(-2);
-            notesHtml = `
-                <div class="notes">
-                    ${recentNotes.map(note => `<div class="note">${this.escapeHtml(note)}</div>`).join('')}
+            const lastNote = business.notes[business.notes.length - 1];
+            const truncatedNote = lastNote.length > 50 ? lastNote.substring(0, 50) + '...' : lastNote;
+            const noteIcon = isMeeting ? 'fas fa-calendar-check' : 'fas fa-sticky-note';
+            compactNotesHtml = `
+                <div class="compact-notes">
+                    <i class="${noteIcon}"></i>
+                    <span>${this.escapeHtml(truncatedNote)}</span>
                 </div>
             `;
         }
         
+        // Create contact row
+        let contactRowHtml = '';
+        const contactItems = [];
+        if (business.phone) {
+            contactItems.push(`<div class="contact-item"><i class="fas fa-phone"></i><span>${this.escapeHtml(business.phone)}</span></div>`);
+        }
+        if (business.email) {
+            const truncatedEmail = business.email.length > 20 ? business.email.substring(0, 20) + '...' : business.email;
+            contactItems.push(`<div class="contact-item"><i class="fas fa-envelope"></i><span>${this.escapeHtml(truncatedEmail)}</span></div>`);
+        }
+        if (contactItems.length > 0) {
+            contactRowHtml = `<div class="contact-row">${contactItems.join('')}</div>`;
+        }
+        
+        // Create business title with icon for special statuses
+        let businessTitleHtml = '';
+        if (isHotLead) {
+            businessTitleHtml = `
+                <div class="business-title">
+                    <i class="fas fa-fire hot-icon"></i>
+                    <h4>${this.escapeHtml(business.name)}</h4>
+                </div>
+            `;
+        } else if (isMeeting) {
+            businessTitleHtml = `
+                <div class="business-title">
+                    <i class="fas fa-handshake meeting-icon"></i>
+                    <h4>${this.escapeHtml(business.name)}</h4>
+                </div>
+            `;
+        } else {
+            businessTitleHtml = `<h4>${this.escapeHtml(business.name)}</h4>`;
+        }
+        
+        // Adjust status text for compact display
+        const compactStatusText = isMeeting ? 'Meeting' : statusText;
+        
         card.innerHTML = `
             <div class="business-header">
-                <h4>${this.escapeHtml(business.name)}</h4>
-                <span class="status-badge status-${statusClass}">${statusText}</span>
+                ${businessTitleHtml}
+                <span class="status-badge status-${statusClass}">${compactStatusText}</span>
             </div>
             <div class="business-details">
-                ${business.status === 'meeting_scheduled' ? '<div class="detail meeting-detail"><i class="fas fa-handshake"></i><span>Ready to Meet!</span></div>' : ''}
-                ${business.status === 'converting' ? '<div class="detail"><i class="fas fa-fire"></i><span>Hot Lead</span></div>' : ''}
                 ${business.city ? `<div class="detail"><i class="fas fa-map-marker-alt"></i><span>${this.escapeHtml(business.city)}</span></div>` : ''}
-                ${business.phone ? `<div class="detail"><i class="fas fa-phone"></i><span>${this.escapeHtml(business.phone)}</span></div>` : ''}
-                ${business.email ? `<div class="detail"><i class="fas fa-envelope"></i><span>${this.escapeHtml(business.email)}</span></div>` : ''}
-                ${business.description ? `<div class="description">${this.escapeHtml(business.description.substring(0, 100))}${business.description.length > 100 ? '...' : ''}</div>` : ''}
-                ${notesHtml}
-            </div>
-            <div class="business-footer">
-                <small>${business.status === 'meeting_scheduled' ? 'Scheduled' : 'Updated'}: ${this.formatDateTime(business.updated_at)}</small>
+                ${contactRowHtml}
+                ${compactNotesHtml}
             </div>
         `;
         
