@@ -279,6 +279,8 @@ class DashboardManager {
             </div>
             <div class="business-details">
                 ${business.status === 'meeting_scheduled' ? '<div class="detail meeting-detail"><i class="fas fa-handshake"></i><span>Ready to Meet!</span></div>' : ''}
+                ${business.status === 'converting' ? '<div class="detail"><i class="fas fa-fire"></i><span>Hot Lead</span></div>' : ''}
+                ${business.city ? `<div class="detail"><i class="fas fa-map-marker-alt"></i><span>${this.escapeHtml(business.city)}</span></div>` : ''}
                 ${business.phone ? `<div class="detail"><i class="fas fa-phone"></i><span>${this.escapeHtml(business.phone)}</span></div>` : ''}
                 ${business.email ? `<div class="detail"><i class="fas fa-envelope"></i><span>${this.escapeHtml(business.email)}</span></div>` : ''}
                 ${business.description ? `<div class="description">${this.escapeHtml(business.description.substring(0, 100))}${business.description.length > 100 ? '...' : ''}</div>` : ''}
