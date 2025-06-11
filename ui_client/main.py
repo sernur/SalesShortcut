@@ -135,7 +135,7 @@ class ConnectionManager:
         if not self.active_connections:
             return
         
-        message = json.dumps(data)
+        message = json.dumps(data, default=str)
         disconnected = set()
         
         for connection in self.active_connections:
