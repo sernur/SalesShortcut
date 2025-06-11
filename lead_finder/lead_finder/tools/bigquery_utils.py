@@ -3,17 +3,16 @@ BigQuery utility tools.
 """
 
 from typing import Dict, Any, List
-from google.adk.tools import ToolContext
+from google.adk.tools import FunctionTool
 from google.cloud import bigquery
 from ..config import PROJECT, DATASET_ID, TABLE_ID
 
-def bigquery_upload(data: List[dict[str, Any]], tool_context: ToolContext) -> dict[str, Any]:
+def bigquery_upload(data: List[dict[str, Any]]) -> dict[str, Any]:
     """
     BigQuery upload tool.
     
     Args:
         data: The business data to upload
-        tool_context: The tool context from ADK
         
     Returns:
         A dictionary containing upload status
@@ -62,3 +61,4 @@ def bigquery_upload(data: List[dict[str, Any]], tool_context: ToolContext) -> di
             "message": f"Error uploading data to BigQuery: {str(e)}"
         }
 
+bigquery_upload_tool = FunctionTool(func=bigquery_upload)

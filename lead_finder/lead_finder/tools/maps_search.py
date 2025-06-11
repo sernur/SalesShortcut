@@ -3,18 +3,17 @@ Google Maps search tool implementation.
 """
 
 from typing import Dict, Any
-from google.adk.tools import ToolContext
+from google.adk.tools import FunctionTool
 import requests
 import json
 from ..config import GOOGLE_MAPS_API_KEY
 
-def google_maps_search(city: str, tool_context: ToolContext) -> dict[str, Any]:
+def google_maps_search(city: str) -> dict[str, Any]:
     """
     Implementation of Google Maps search for businesses in a specified city.
     
     Args:
         city: The name of the city to search in
-        tool_context: The tool context from ADK
 
     Returns:
         A dictionary containing search results
@@ -70,3 +69,5 @@ def google_maps_search(city: str, tool_context: ToolContext) -> dict[str, Any]:
     
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+google_maps_search_tool = FunctionTool(func=google_maps_search)

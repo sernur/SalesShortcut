@@ -446,35 +446,73 @@ async def websocket_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 # Agent callback endpoint
+# In ui_client/main.py
+# In ui_client/main.py
+
+# In ui_client/main.py
+
+# In ui_client/main.py
+
 @app.post("/agent_callback")
 async def agent_callback(update: AgentUpdate):
-    """Endpoint for agents to send updates about business processing."""
+    """
+    Endpoint for agents to send updates about business processing.
+    This version handles creating new businesses and correctly serializes
+    Pydantic models before sending them over WebSockets.
+    """
     logger.info(f"Received agent callback: {update.agent_type} for business {update.business_id}")
-    
-    # Update business status if it exists
+
+    # Check if business exists
     if update.business_id in app_state["businesses"]:
+        # Business exists, so update it
         business = app_state["businesses"][update.business_id]
         business.status = update.status
         business.updated_at = datetime.now()
         business.notes.append(f"{update.agent_type}: {update.message}")
-        
-        # Store agent update
-        app_state["agent_updates"].append(update)
-        
-        # Send real-time update
-        await manager.send_update({
-            "type": "business_updated",
-            "agent": update.agent_type,
-            "business": business.dict(),
-            "update": update.dict(),
-            "timestamp": datetime.now().isoformat(),
-        })
-        
         logger.info(f"Updated business {business.name} status to {update.status}")
-        return {"status": "success", "message": "Business updated"}
     else:
-        logger.warning(f"Business ID {update.business_id} not found")
-        return {"status": "error", "message": "Business not found"}
+        # Business does NOT exist, so create it from the callback data
+        logger.info(f"Business ID {update.business_id} not found. Creating new business entry.")
+        if update.data and "name" in update.data and "city" in update.data:
+            try:
+                new_business = Business(
+                    id=update.business_id,
+                    name=update.data.get("name"),
+                    phone=update.data.get("phone"),
+                    email=update.data.get("email"),
+                    description=update.data.get("description"),
+                    city=update.data.get("city"),
+                    status=update.status,
+                    notes=[f"{update.agent_type}: {update.message}"]
+                )
+                app_state["businesses"][update.business_id] = new_business
+            except Exception as e:
+                logger.error(f"Failed to create business from callback data: {e}")
+                return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid business data for creation"})
+        else:
+            logger.warning(f"Cannot create business {update.business_id}: 'data' field in callback is missing or incomplete.")
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Cannot create business from incomplete data"})
+
+    # Get the final business object to send in the update.
+    final_business_obj = app_state["businesses"].get(update.business_id)
+    if final_business_obj:
+        # Store agent update in our list
+        app_state["agent_updates"].append(update)
+
+        # Build the JSON-safe payload using .model_dump()
+        update_payload = {
+            "type": "business_updated",
+            "agent": update.agent_type.value,
+            "business": final_business_obj.model_dump(),
+            "update": update.model_dump(),
+            "timestamp": datetime.now().isoformat(),
+        }
+
+        # Send the payload over the WebSocket
+        await manager.send_update(update_payload)
+
+    return JSONResponse(status_code=200, content={"status": "success", "message": "Business processed"})
+
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request) -> HTMLResponse:
