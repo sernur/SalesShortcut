@@ -366,18 +366,18 @@ async def phone_call_tool(
             
             # Enhanced system prompt with categorization instructions
             system_prompt = f"""
-{prompt}
-
-IMPORTANT CATEGORIZATION INSTRUCTIONS:
-Your main goal is to categorize this call into one of these three categories based on the prospect's response:
-
-1. "agreed_for_getting_email_proposal" - Prospect is interested and wants to receive an email proposal
-2. "not_interested" - Prospect is not interested in the offering
-3. "call_later" - Prospect asks to be called back later or wants to think about it
-
-Keep the call focused and within {max_duration_minutes} minutes. 
-At the end of the call, clearly determine which category the prospect falls into based on their responses.
-"""
+            {prompt}
+            
+            IMPORTANT CATEGORIZATION INSTRUCTIONS:
+            Your main goal is to categorize this call into one of these three categories based on the prospect's response:
+            
+            1. "agreed_for_getting_email_proposal" - Prospect is interested and wants to receive an email proposal
+            2. "not_interested" - Prospect is not interested in the offering
+            3. "call_later" - Prospect asks to be called back later or wants to think about it
+            
+            Keep the call focused and within {max_duration_minutes} minutes. 
+            At the end of the call, clearly determine which category the prospect falls into based on their responses.
+            """
             
             # Extract first message from prompt
             first_message = prompt.split('\n')[0] if '\n' in prompt else prompt[:100] + "..."
@@ -448,4 +448,38 @@ At the end of the call, clearly determine which category the prospect falls into
         return call_data
 
 
+async def phone_call_tool_test(
+    destination: str,
+    prompt: str
+) -> Dict[str, Any]:
+    """
+    Test version of the phone call tool for outreach activities.
+    
+    Args:
+        destination: The phone number to call (E.164 format recommended)
+        prompt: The complete prompt/instruction for the call agent
+        
+    Returns:
+        A dictionary containing test call results
+    """
+    # Call the main phone_call_tool with test parameters
+    # Sleep for 3 seconds to simulate processing time
+    await asyncio.sleep(3)
+    # Mock conversation result
+    return {
+        "status": "test_completed",
+        "destination": destination,
+        "prompt": prompt,
+        "transcript": [
+            {"role": "agent", "message": "Hello, my name is Lexi from SalesShortcuts and I am calling to disscuss the potential building website for your business."},
+            {"role": "user", "message": "Hi, thanks for calling. How it would help my business?"},
+            {"role": "agent", "message": "We can help you build a professional website that attracts more customers and increases your online presence."},
+            {"role": "user", "message": "That sounds interesting, can you send me more details via email?"},
+            {"role": "agent", "message": "Sure, I will send you an email with all the details right away."}
+        ],
+        "summary": f"[TEST] Call to {destination} completed successfully."
+    }
+
+
 phone_call_function_tool = FunctionTool(func=phone_call_tool)
+phone_call_test_function_tool = FunctionTool(func=phone_call_tool_test)

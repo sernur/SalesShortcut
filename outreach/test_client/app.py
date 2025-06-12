@@ -122,7 +122,7 @@ async def call_outreach_agent_a2a(task_type: str, task_data: dict[str, Any], ses
                     "message": task_data["script"],
                     "operation": "conduct_outreach"
                 }
-            elif task_type == "email":
+            elif task_type == "email": 
                 outreach_data = {
                     "target": task_data["to_email"],
                     "type": "email",
