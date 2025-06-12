@@ -109,17 +109,21 @@ class OutreachAgentExecutor(AgentExecutor):
             "operation": "conduct_outreach"
         }
         
-        # Create a clear user message for the agent
-        user_message = f"Conduct {outreach_type} outreach to {outreach_target}"
-        
-        # Create both text and structured data
+        if outreach_type == "phone":
+            llm_prompt_text = f"Make a phone call to {outreach_target}. The script is: '{outreach_message}'"
+        elif outreach_type == "email":
+            llm_prompt_text = f"Send an email to {outreach_target} with the following content: '{outreach_message}'"
+        else:
+            llm_prompt_text = f"Conduct outreach: {outreach_message} to {outreach_target} ({outreach_type})."
+
         adk_content = genai_types.Content(
             parts=[
-                genai_types.Part(text=user_message),
-                genai_types.Part(text=json.dumps(agent_input_dict))
+                genai_types.Part(text=llm_prompt_text),
             ]
         )
-
+        # Log the content being sent to the ADK agent
+        logger.info(f"Task {context.task_id}: ADK Agent input content: {adk_content}")
+        
         # [Rest of the session handling code remains the same...]
         session_id_for_adk = context.context_id
         logger.info(f"Task {context.task_id}: Using ADK session_id: '{session_id_for_adk}' for outreach: '{outreach_target}'")

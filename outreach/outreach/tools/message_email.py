@@ -145,4 +145,43 @@ async def message_email_tool(
         return email_data
 
 
+async def message_email_tool_test(
+    to_email: str,
+    subject: str,
+    message_body: str,
+    email_type: str = "outreach",
+    cc_emails: Optional[List[str]] = None,
+    personalization_data: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Test version of the email messaging tool for outreach activities.
+    
+    Args:
+        to_email: Recipient email address
+        subject: Email subject line
+        message_body: The email message content
+        email_type: Type of email (e.g., "outreach", "follow_up", "meeting_invite")
+        cc_emails: Optional list of CC email addresses
+        personalization_data: Optional data for personalizing the email
+        
+    Returns:
+        A dictionary containing test email send results and status
+    """
+    
+    # Sleep 3 seconds to simulate processing time
+    await asyncio.sleep(3)
+    return {
+        "status": "test_success",
+        "message": "Test email sent successfully",
+        "to_email": to_email,
+        "subject": subject,
+        "message_body": message_body,
+        "email_type": email_type,
+        "cc_emails": cc_emails or [],
+        "personalization_data": personalization_data or {},
+        "next_action": "Verify test email in inbox"
+    }
+
+
 message_email_function_tool = FunctionTool(func=message_email_tool)
+message_email_test_function_tool = FunctionTool(func=message_email_tool_test)
