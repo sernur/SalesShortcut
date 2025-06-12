@@ -101,6 +101,11 @@ run_outreach_agent:
 	@echo "📍 Mode: Simple HTTP (avoiding dependency conflicts)"
 	@GOOGLE_API_KEY="$(GOOGLE_API_KEY)" \
 	 FORCE_SIMPLE_MODE=false python -m outreach --host localhost --port 8083
+	
+	echo "Starting Outreach service in the background..."
+	GOOGLE_API_KEY="$GOOGLE_API_KEY" python -m outreach &
+	OUTREACH_PID=$!
+	echo "Outreach started with PID: $OUTREACH_PID"
 
 test_outreach_full:
 	@echo "🧪 Starting full Outreach test environment..."

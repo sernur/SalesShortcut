@@ -462,24 +462,29 @@ async def phone_call_tool_test(
     Returns:
         A dictionary containing test call results
     """
-    # Call the main phone_call_tool with test parameters
     # Sleep for 3 seconds to simulate processing time
     await asyncio.sleep(3)
+    
     # Mock conversation result
-    return {
+    result = {
+        "id": f"test_phone_call_{int(time.time())}",
+        "action_type": "phone_call",
         "status": "test_completed",
         "destination": destination,
         "prompt": prompt,
         "transcript": [
-            {"role": "agent", "message": "Hello, my name is Lexi from SalesShortcuts and I am calling to disscuss the potential building website for your business."},
+            {"role": "agent", "message": "Hello, my name is Lexi from SalesShortcuts and I am calling to discuss the potential building website for your business."},
             {"role": "user", "message": "Hi, thanks for calling. How it would help my business?"},
             {"role": "agent", "message": "We can help you build a professional website that attracts more customers and increases your online presence."},
             {"role": "user", "message": "That sounds interesting, can you send me more details via email?"},
             {"role": "agent", "message": "Sure, I will send you an email with all the details right away."}
         ],
-        "summary": f"[TEST] Call to {destination} completed successfully."
+        "summary": f"[TEST] Call to {destination} completed successfully.",
+        "timestamp": datetime.now().isoformat()
     }
+    
+    logger.info(f"Phone call tool test completed: {result}")
+    return result
 
 
-phone_call_function_tool = FunctionTool(func=phone_call_tool)
-phone_call_test_function_tool = FunctionTool(func=phone_call_tool_test)
+phone_call_function_tool = FunctionTool(func=phone_call_tool_test)

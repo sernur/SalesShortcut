@@ -140,65 +140,65 @@ async def post_results_callback(callback_context: CallbackContext) -> Optional[g
     logger.info("[Callback] UI updates sent. Callback finished.")
     return None
 
-# --- post_results_callback_test remains unchanged and works as a good example ---
-async def post_results_callback_test(callback_context: CallbackContext) -> Optional[genai_types.Content]:
-    """
-    Fixed callback - NO MORE invocation_result error
-    """
-    agent_name = callback_context.agent_name
-    logger.info(f"[Callback TEST] Exiting agent: {agent_name}. Processing final result.")
+# # --- post_results_callback_test remains unchanged and works as a good example ---
+# async def post_results_callback_test(callback_context: CallbackContext) -> Optional[genai_types.Content]:
+#     """
+#     Fixed callback - NO MORE invocation_result error
+#     """
+#     agent_name = callback_context.agent_name
+#     logger.info(f"[Callback TEST] Exiting agent: {agent_name}. Processing final result.")
     
-    # Create mock data for testing since we can't extract real data yet
-    final_businesses = [
-        {
-            "id": "test_1",
-            "name": "Test Business 1 Mary",
-            "address": "123 Test St, Mary",
-            "city": "Mary",  # <--- ADDED HERE IN MOCK DATA
-            "phone": "+1-555-0123",
-            "website": None,
-            "category": "Test Category",
-            "established": "2020"
-        },
-        {
-            "id": "test_2",
-            "name": "Test Business 2 Mary",
-            "address": "456 Test Ave, Mary",
-            "city": "Mary", # <--- AND HERE
-            "phone": "+1-555-0456",
-            "website": None,
-            "category": "Test Category 2",
-            "established": "2021"
-        }
-    ]
+#     # Create mock data for testing since we can't extract real data yet
+#     final_businesses = [
+#         {
+#             "id": "test_1",
+#             "name": "Test Business 1 Mary",
+#             "address": "123 Test St, Mary",
+#             "city": "Mary",  # <--- ADDED HERE IN MOCK DATA
+#             "phone": "+1-555-0123",
+#             "website": None,
+#             "category": "Test Category",
+#             "established": "2020"
+#         },
+#         {
+#             "id": "test_2",
+#             "name": "Test Business 2 Mary",
+#             "address": "456 Test Ave, Mary",
+#             "city": "Mary", # <--- AND HERE
+#             "phone": "+1-555-0456",
+#             "website": None,
+#             "category": "Test Category 2",
+#             "established": "2021"
+#         }
+#     ]
     
-    logger.info(f"[Callback] Creating mock data: {len(final_businesses)} businesses")
+#     logger.info(f"[Callback] Creating mock data: {len(final_businesses)} businesses")
     
-    for business in final_businesses:
-        send_update_to_ui(business)
+#     for business in final_businesses:
+#         send_update_to_ui(business)
     
-    # Save as artifact
-    try:
-        await callback_context.save_artifact("final_lead_results", {
-            "businesses": final_businesses,
-            "count": len(final_businesses)
-        })
-        logger.info(f"[Callback] Saved artifact with {len(final_businesses)} businesses")
-    except Exception as e:
-        logger.error(f"[Callback] Error saving artifact: {e}")
+#     # Save as artifact
+#     try:
+#         await callback_context.save_artifact("final_lead_results", {
+#             "businesses": final_businesses,
+#             "count": len(final_businesses)
+#         })
+#         logger.info(f"[Callback] Saved artifact with {len(final_businesses)} businesses")
+#     except Exception as e:
+#         logger.error(f"[Callback] Error saving artifact: {e}")
     
-    # Return the final content for the A2A task
-    final_output_content = genai_types.Content(
-        parts=[
-            genai_types.Part(
-                function_call=genai_types.FunctionCall(
-                    name="final_lead_results",
-                    args={"businesses": final_businesses, "count": len(final_businesses)},
-                )
-            )
-        ],
-        role="model",
-    )
+#     # Return the final content for the A2A task
+#     final_output_content = genai_types.Content(
+#         parts=[
+#             genai_types.Part(
+#                 function_call=genai_types.FunctionCall(
+#                     name="final_lead_results",
+#                     args={"businesses": final_businesses, "count": len(final_businesses)},
+#                 )
+#             )
+#         ],
+#         role="model",
+#     )
 
-    logger.info("[Callback] UI updates sent. Callback finished.")
-    return None
+#     logger.info("[Callback] UI updates sent. Callback finished.")
+#     return None

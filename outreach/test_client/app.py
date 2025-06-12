@@ -153,9 +153,11 @@ async def call_outreach_agent_a2a(task_type: str, task_data: dict[str, Any], ses
             )
 
             # Send request to Outreach
+            business_logger.info(f"Sending A2A request to Outreach: {outreach_data}")
             response: SendMessageResponse = await a2a_client.send_message(sdk_request)
             root_response_part = response.root
-            
+            business_logger.info(f"Received A2A response from Outreach: {root_response_part}")
+
             if isinstance(root_response_part, JSONRPCErrorResponse):
                 actual_error = root_response_part.error
                 business_logger.error(
