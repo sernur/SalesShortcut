@@ -148,7 +148,11 @@
         <div class="result {% if phone_result.success %}success{% else %}error{% endif %}">
             <h3>📞 Phone Call Result:</h3>
             {% if phone_result.success %}
-                <pre>{{ phone_result.result | tojson(indent=2) }}</pre>
+                {% if phone_result.result %}
+                    <pre>{{ phone_result.result | tojson(indent=2) }}</pre>
+                {% else %}
+                    <strong>Success:</strong> Phone call completed successfully
+                {% endif %}
             {% else %}
                 <strong>Error:</strong> {{ phone_result.error }}
             {% endif %}
@@ -160,7 +164,11 @@
         <div class="result {% if email_result.success %}success{% else %}error{% endif %}">
             <h3>📧 Email Result:</h3>
             {% if email_result.success %}
-                <pre>{{ email_result.result | tojson(indent=2) }}</pre>
+                {% if email_result.result %}
+                    <pre>{{ email_result.result | tojson(indent=2) }}</pre>
+                {% else %}
+                    <strong>Success:</strong> Email sent successfully
+                {% endif %}
             {% else %}
                 <strong>Error:</strong> {{ email_result.error }}
             {% endif %}

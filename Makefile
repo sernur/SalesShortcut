@@ -20,24 +20,31 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 
-.PHONY: help deploy_local deploy_cloud test_local clean setup check_env run_outreach_test_client
+.PHONY: help deploy_local deploy_cloud test_local clean setup check_env run_outreach_test_client run_outreach_agent
 
 help:
 	@echo "SalesShortcut A2A Project - Available Commands:"
 	@echo ""
-	@echo "  make deploy_local    - Deploy all services locally"
-	@echo "  make deploy_cloud    - Deploy all services to cloud"
-	@echo "  make test_local      - Run test deployment (UI Client + Lead Manager)"
-	@echo "  make clean           - Kill all running services"
-	@echo "  make setup           - Install Python dependencies"
-	@echo "  make check_env       - Check environment variables"
-	@echo "  make run_outreach_test_client - Start the Outreach Agent test web client on port 8501"
-	@echo "  make help            - Show this help"
+	@echo "  make deploy_local               - Deploy all services locally"
+	@echo "  make deploy_cloud               - Deploy all services to cloud"
+	@echo "  make test_local                 - Run test deployment (UI Client + Lead Manager)"
+	@echo "  make clean                      - Kill all running services"
+	@echo "  make setup                      - Install Python dependencies"
+	@echo "  make check_env                  - Check environment variables"
+	@echo ""
+	@echo "Outreach Agent Commands:"
+	@echo "  make run_outreach_agent         - Start Outreach Agent on port 8083 (simple mode)"
+	@echo "  make run_outreach_test_client   - Start Test Client on port 8501 (simple mode)" 
+	@echo "  make run_outreach_test_client_a2a - Start Test Client with A2A (may have conflicts)"
+	@echo "  make test_outreach_full         - Start both Agent and Test Client together"
+	@echo ""
+	@echo "  make help                       - Show this help"
 	@echo ""
 	@echo "Environment Variables:"
 	@echo "  GOOGLE_API_KEY       - Required for Gemini LLM inference"
 	@echo "  OPENAI_API_KEY       - Optional for OpenAI models"
 	@echo "  ANTHROPIC_API_KEY    - Optional for Claude models"
+	@echo "  FORCE_SIMPLE_MODE    - Set to 'true' to avoid A2A dependency conflicts"
 	@echo ""
 	@echo "Create a .env file to set API keys automatically:"
 	@echo "  echo 'GOOGLE_API_KEY=your_key_here' > .env"
@@ -81,7 +88,27 @@ test_local: clean check_env
 
 run_outreach_test_client:
 	@echo "🧪 Starting Outreach Agent Test Client on port 8501..."
+	@echo "📍 Mode: Simple HTTP (avoiding anyio dependency conflicts)"
+	@cd outreach/test_client && pip install -r requirements-simple.txt && FORCE_SIMPLE_MODE=true uvicorn app:app --reload --port 8501
+
+run_outreach_test_client_a2a:
+	@echo "🧪 Starting Outreach Agent Test Client with A2A support on port 8501..."
+	@echo "⚠️  Note: May have dependency conflicts with anyio"
 	@cd outreach/test_client && pip install -r requirements.txt && uvicorn app:app --reload --port 8501
+
+run_outreach_agent:
+	@echo "🤖 Starting Outreach Agent on port 8083..."
+	@echo "📍 Mode: Simple HTTP (avoiding dependency conflicts)"
+	@GOOGLE_API_KEY="$(GOOGLE_API_KEY)" \
+	 FORCE_SIMPLE_MODE=false python -m outreach --host localhost --port 8083
+
+test_outreach_full:
+	@echo "🧪 Starting full Outreach test environment..."
+	@echo "🤖 Starting Outreach Agent on port 8083..."
+	@FORCE_SIMPLE_MODE=true python -m outreach --host localhost --port 8083 &
+	@sleep 3
+	@echo "🌐 Starting Test Client on port 8501..."
+	@cd outreach/test_client && pip install -r requirements-simple.txt && FORCE_SIMPLE_MODE=true OUTREACH_AGENT_URL="http://localhost:8083" uvicorn app:app --reload --port 8501
 
 clean:
 	@echo "🧹 Stopping all services..."

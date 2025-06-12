@@ -30,23 +30,59 @@ The test client supports two communication modes:
 
 ## Running
 
-### Start the Outreach Agent (required dependency)
+### Quick Start (Recommended - Simple Mode)
 
-First, ensure the Outreach Agent is running:
+Use the Makefile commands to avoid dependency conflicts:
+
 ```bash
-# From the project root
+# Start both services together (simple mode)
+make test_outreach_full
+```
+
+Or start them individually:
+```bash
+# Terminal 1: Start Outreach Agent
+make run_outreach_agent
+
+# Terminal 2: Start Test Client
+make run_outreach_test_client
+```
+
+### Manual Setup
+
+#### Start the Outreach Agent
+
+```bash
+# Simple mode (recommended - avoids anyio conflicts)
+FORCE_SIMPLE_MODE=true python -m outreach --host localhost --port 8083
+
+# A2A mode (requires proper ADK setup)
 python -m outreach --port 8083
 ```
 
-### Start the Test Client
+#### Start the Test Client
 
-Start the test client on port 8501:
 ```bash
-# From the outreach/test_client directory
+# Simple mode (recommended)
+cd outreach/test_client
+pip install -r requirements-simple.txt
+FORCE_SIMPLE_MODE=true uvicorn app:app --reload --port 8501
+
+# A2A mode (may have dependency conflicts)
+pip install -r requirements.txt
 uvicorn app:app --reload --port 8501
 ```
 
 Open http://localhost:8501 in your browser to access the interface.
+
+### Troubleshooting
+
+**anyio ImportError**: If you see `ImportError: cannot import name 'iterate_exceptions'`, use simple mode:
+```bash
+FORCE_SIMPLE_MODE=true make test_outreach_full
+```
+
+**500 Internal Server Error**: Both services must be running in the same mode (both simple or both A2A).
 
 ## Usage
 
