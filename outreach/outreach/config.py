@@ -8,6 +8,9 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+# Google API configuration
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+
 # Model configuration
 MODEL = os.getenv("MODEL", "gemini-2.0-flash-lite")
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.2"))
@@ -30,3 +33,6 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 EMAIL_USERNAME = os.getenv("EMAIL_USERNAME", "")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "")
 FROM_EMAIL = os.getenv("FROM_EMAIL", "")
+
+# Google Maps API configuration
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY", "")
