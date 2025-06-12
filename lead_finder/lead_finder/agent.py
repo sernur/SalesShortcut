@@ -7,7 +7,7 @@ from .config import MODEL
 from .prompts import ROOT_AGENT_PROMPT
 from .sub_agents.potential_lead_finder_agent import potential_lead_finder_agent
 from .sub_agents.merger_agent import merger_agent
-from .callbacks import post_results_callback, post_results_callback_test
+from .callbacks import post_results_callback
 
 # Create the root agent (LeadFinderAgent)
 lead_finder_agent = SequentialAgent(

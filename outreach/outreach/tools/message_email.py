@@ -167,10 +167,17 @@ async def message_email_tool_test(
     Returns:
         A dictionary containing test email send results and status
     """
+    import time
+    import logging
+    
+    logger = logging.getLogger(__name__)
     
     # Sleep 3 seconds to simulate processing time
     await asyncio.sleep(3)
-    return {
+    
+    result = {
+        "id": f"test_email_{int(time.time())}",
+        "action_type": "email",
         "status": "test_success",
         "message": "Test email sent successfully",
         "to_email": to_email,
@@ -179,9 +186,12 @@ async def message_email_tool_test(
         "email_type": email_type,
         "cc_emails": cc_emails or [],
         "personalization_data": personalization_data or {},
-        "next_action": "Verify test email in inbox"
+        "next_action": "Verify test email in inbox",
+        "timestamp": datetime.now().isoformat()
     }
+    
+    logger.info(f"Email tool test completed: {result}")
+    return result
 
 
-message_email_function_tool = FunctionTool(func=message_email_tool)
-message_email_test_function_tool = FunctionTool(func=message_email_tool_test)
+message_email_function_tool = FunctionTool(func=message_email_tool_test)

@@ -110,11 +110,11 @@ class OutreachAgentExecutor(AgentExecutor):
         }
         
         if outreach_type == "phone":
-            llm_prompt_text = f"Make a phone call to {outreach_target}. The script is: '{outreach_message}'"
+            llm_prompt_text = f"PHONE CALL TASK: Use the phone_call_tool_test to call {outreach_target} with this script: '{outreach_message}'. You must use the tool, do not just respond with text."
         elif outreach_type == "email":
-            llm_prompt_text = f"Send an email to {outreach_target} with the following content: '{outreach_message}'"
+            llm_prompt_text = f"EMAIL TASK: Use the message_email_tool_test to send an email to {outreach_target} with this content: '{outreach_message}'. You must use the tool, do not just respond with text."
         else:
-            llm_prompt_text = f"Conduct outreach: {outreach_message} to {outreach_target} ({outreach_type})."
+            llm_prompt_text = f"OUTREACH TASK: Use the appropriate tool to conduct {outreach_type} outreach to {outreach_target} with message: '{outreach_message}'. You must use a tool, do not just respond with text."
 
         adk_content = genai_types.Content(
             parts=[
@@ -147,7 +147,7 @@ class OutreachAgentExecutor(AgentExecutor):
                         app_name=self._adk_runner.app_name,
                         user_id="a2a_user",
                         session_id=session_id_for_adk,
-                        state={"target": outreach_target, "type": outreach_type},
+                        state=agent_input_dict,
                     )
                     if session:
                         logger.info(f"Task {context.task_id}: Successfully created ADK session for outreach: {outreach_target}")
@@ -174,7 +174,7 @@ class OutreachAgentExecutor(AgentExecutor):
         # Execute the ADK Agent
         try:
             logger.info(f"Task {context.task_id}: Calling ADK run_async for outreach: {outreach_target}")
-            final_result = {"status": "completed", "target": outreach_target, "type": outreach_type, "results": []}
+            final_result = {"status": "completed", "agent_input": agent_input_dict, "results": []}
             
             async for event in self._adk_runner.run_async(
                 user_id="a2a_user",
@@ -183,14 +183,14 @@ class OutreachAgentExecutor(AgentExecutor):
             ):
                 if event.is_final_response():
                     if event.content and event.content.parts:
-                        # Look for function calls with outreach data
+                        # Look for function calls with business data
                         for part in event.content.parts:
                             if hasattr(part, 'function_call') and part.function_call:
-                                if part.function_call.name in ["phone_call_tool", "message_email_tool"]:
-                                    outreach_results = part.function_call.args
-                                    final_result["results"].append(outreach_results)
-                                    logger.info(f"Task {context.task_id}: Completed {part.function_call.name} for {outreach_target}")
-                            elif hasattr(part, "text") and part.text:
+                                if part.function_call.name == "final_outreach_results":
+                                    results = part.function_call.args.get("results", [])
+                                    final_result["results"].extend(results)
+                                    logger.info(f"Task {context.task_id}: Retrieved {len(results)} outreach results from ADK Agent")
+                            elif hasattr(part, 'text') and part.text:
                                 final_result["message"] = part.text
 
             task_updater.add_artifact(
