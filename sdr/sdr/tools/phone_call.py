@@ -388,11 +388,11 @@ async def phone_call_tool(
                 agent_id=agent_id,
                 phone_number_id=phone_number_id,
                 to_number=destination,
-                instructionsystem_prompt,
+                instruction=system_prompt,
                 first_message=first_message,
                 poll_interval=1.0
             )
-            
+
             # Process the real call result and categorize
             if call_result["status"] in ["done", "completed_successfully"]:
                 call_result["status"] = "completed"
