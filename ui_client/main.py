@@ -379,6 +379,157 @@ async def call_lead_finder_agent(city: str, session_id: str) -> dict[str, Any]:
     else:
         return await call_lead_finder_agent_simple(city, session_id)
 
+async def call_sdr_agent_a2a(business_data: dict[str, Any], session_id: str) -> dict[str, Any]:
+    """
+    Calls the SDR agent via A2A to process a business lead.
+    """
+    business_logger = logging.getLogger(BUSINESS_LOGIC_LOGGER)
+    
+    sdr_url = os.environ.get(
+        "SDR_SERVICE_URL", config.DEFAULT_SDR_URL
+    ).rstrip("/")
+    
+    business_logger.info(f"Calling SDR agent at {sdr_url} for business: {business_data.get('name', 'Unknown')}")
+    
+    outcome = {
+        "success": False,
+        "message": None,
+        "error": None,
+    }
+    
+    try:
+        async with httpx.AsyncClient() as http_client:
+            a2a_client = A2AClient(httpx_client=http_client, url=sdr_url)
+            
+            # Prepare A2A message
+            a2a_task_id = f"sdr-engagement-{session_id}-{business_data.get('id', 'unknown')}"
+            
+            sdk_message = A2AMessage(
+                taskId=a2a_task_id,
+                contextId=session_id,
+                messageId=str(uuid.uuid4()),
+                role=A2ARole.user,
+                parts=[A2ADataPart(data=business_data)],
+                metadata={"operation": "engage_lead", "business_id": business_data.get("id")},
+            )
+            
+            sdk_send_params = MessageSendParams(
+                message=sdk_message,
+                configuration=MessageSendConfiguration(
+                    acceptedOutputModes=["data", "application/json"]
+                ),
+            )
+            
+            sdk_request = SendMessageRequest(
+                id=str(uuid.uuid4()), params=sdk_send_params
+            )
+            
+            # Send request to SDR agent
+            response: SendMessageResponse = await a2a_client.send_message(sdk_request)
+            root_response_part = response.root
+            
+            if isinstance(root_response_part, JSONRPCErrorResponse):
+                actual_error = root_response_part.error
+                business_logger.error(
+                    f"A2A Error from SDR agent: {actual_error.code} - {actual_error.message}"
+                )
+                outcome["error"] = f"A2A Error: {actual_error.code} - {actual_error.message}"
+                
+            elif isinstance(root_response_part, SendMessageSuccessResponse):
+                task_result: A2ATask = root_response_part.result
+                business_logger.info(
+                    f"SDR agent task {task_result.id} completed with state: {task_result.status.state}"
+                )
+                
+                outcome["success"] = True
+                outcome["message"] = f"SDR agent has started processing {business_data.get('name', 'the business')}"
+                
+            else:
+                business_logger.error(f"Invalid A2A response type: {type(root_response_part)}")
+                outcome["error"] = "Invalid response type"
+                
+    except Exception as e:
+        if A2A_AVAILABLE and 'A2AClientHTTPError' in str(type(e)):
+            business_logger.error(f"HTTP Error calling SDR agent: {e}")
+            outcome["error"] = f"Connection Error: {e}"
+        elif A2A_AVAILABLE and 'A2AClientJSONError' in str(type(e)):
+            business_logger.error(f"JSON Error from SDR agent: {e}")
+            outcome["error"] = f"JSON Response Error: {e}"
+        else:
+            business_logger.error(f"Unexpected error calling SDR agent: {e}", exc_info=True)
+            outcome["error"] = f"Unexpected error: {e}"
+    
+    return outcome
+
+async def call_sdr_agent_simple(business_data: dict[str, Any], session_id: str) -> dict[str, Any]:
+    """
+    Calls the SDR agent via simple HTTP POST when A2A is not available.
+    """
+    business_logger = logging.getLogger(BUSINESS_LOGIC_LOGGER)
+    
+    sdr_url = os.environ.get(
+        "SDR_SERVICE_URL", config.DEFAULT_SDR_URL
+    ).rstrip("/")
+    
+    business_logger.info(f"Calling SDR agent (simple HTTP) at {sdr_url} for business: {business_data.get('name', 'Unknown')}")
+    
+    outcome = {
+        "success": False,
+        "message": None,
+        "error": None,
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            # Try different endpoints that might exist
+            endpoints_to_try = [
+                f"{sdr_url}/engage_lead",
+                f"{sdr_url}/process",
+                f"{sdr_url}/",
+            ]
+            
+            sdr_data = {
+                "business": business_data,
+                "session_id": session_id,
+            }
+            
+            for endpoint in endpoints_to_try:
+                try:
+                    business_logger.info(f"Trying SDR endpoint: {endpoint}")
+                    response = await client.post(endpoint, json=sdr_data)
+                    
+                    if response.status_code == 200:
+                        result_data = response.json()
+                        business_logger.info(f"Got response from SDR at {endpoint}: {result_data}")
+                        
+                        outcome["success"] = True
+                        outcome["message"] = f"SDR agent has started processing {business_data.get('name', 'the business')}"
+                        break
+                    
+                    business_logger.warning(f"SDR endpoint {endpoint} returned status {response.status_code}")
+                    
+                except Exception as e:
+                    business_logger.warning(f"SDR endpoint {endpoint} failed: {e}")
+                    continue
+            
+            if not outcome["success"]:
+                outcome["error"] = "All SDR agent endpoints failed"
+                
+    except Exception as e:
+        business_logger.error(f"Unexpected error calling SDR agent: {e}", exc_info=True)
+        outcome["error"] = f"Unexpected error: {e}"
+    
+    return outcome
+
+async def call_sdr_agent(business_data: dict[str, Any], session_id: str) -> dict[str, Any]:
+    """
+    Calls the SDR agent - uses A2A if available, otherwise falls back to simple HTTP.
+    """
+    if A2A_AVAILABLE:
+        return await call_sdr_agent_a2a(business_data, session_id)
+    else:
+        return await call_sdr_agent_simple(business_data, session_id)
+
 async def run_lead_finding_process(city: str, session_id: str):
     """Run the complete lead finding process."""
     business_logger = logging.getLogger(BUSINESS_LOGIC_LOGGER)
@@ -614,6 +765,57 @@ async def get_status():
         "business_count": len(app_state["businesses"]),
         "session_id": app_state["session_id"],
     }
+
+@app.post("/send_to_sdr")
+async def send_business_to_sdr(business_id: str = Form(...)):
+    """Send a business to the SDR agent for processing."""
+    try:
+        # Check if business exists
+        if business_id not in app_state["businesses"]:
+            return JSONResponse(
+                status_code=404,
+                content={"error": "Business not found"}
+            )
+        
+        business = app_state["businesses"][business_id]
+        
+        # Convert business to dict for sending to SDR
+        business_data = business.model_dump()
+        
+        # Get current session ID
+        session_id = app_state["session_id"] or str(uuid.uuid4())
+        
+        logger.info(f"Sending business {business.name} to SDR agent")
+        
+        # Call SDR agent
+        result = await call_sdr_agent(business_data, session_id)
+        
+        if result["success"]:
+            # Send success update via WebSocket
+            await manager.send_update({
+                "type": "sdr_engaged",
+                "business_id": business_id,
+                "business_name": business.name,
+                "message": result["message"],
+                "timestamp": datetime.now().isoformat(),
+            })
+            
+            return JSONResponse(
+                status_code=200,
+                content={"success": True, "message": result["message"]}
+            )
+        else:
+            return JSONResponse(
+                status_code=500,
+                content={"error": result["error"]}
+            )
+            
+    except Exception as e:
+        logger.error(f"Error sending business to SDR: {e}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to send to SDR: {e}"}
+        )
 
 @app.post("/reset")
 async def reset_state():

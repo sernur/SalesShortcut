@@ -112,6 +112,9 @@ class DashboardManager {
             case 'state_reset':
                 this.handleStateReset(data);
                 break;
+            case 'sdr_engaged':
+                this.handleSdrEngaged(data);
+                break;
             default:
                 console.log('Unknown message type:', data.type);
         }
@@ -281,9 +284,17 @@ class DashboardManager {
         const card = document.createElement('div');
         const isHotLead = business.status === 'converting';
         const isMeeting = business.status === 'meeting_scheduled';
+        const isClickable = business.status === 'found'; // Only "found" businesses can be sent to SDR
         
-        card.className = `business-card compact ${isMeeting ? 'meeting-card' : ''} ${isHotLead ? 'hot-lead' : ''}`;
+        card.className = `business-card compact ${isMeeting ? 'meeting-card' : ''} ${isHotLead ? 'hot-lead' : ''} ${isClickable ? 'clickable' : ''}`;
         card.setAttribute('data-business-id', business.id);
+        
+        // Add click handler for "found" status businesses
+        if (isClickable) {
+            card.addEventListener('click', () => {
+                this.showSdrDialog(business);
+            });
+        }
         
         const statusText = this.getStatusText(business.status);
         const statusClass = business.status.replace('_', '-');
@@ -551,6 +562,153 @@ class DashboardManager {
     initializeEventListeners() {
         // Any additional event listeners can be added here
     }
+    
+    handleSdrEngaged(data) {
+        console.log('SDR engaged for business:', data.business_name);
+        this.addActivityLogEntry('sdr', data.message, data.timestamp);
+        this.showSuccessToast(`${data.business_name} sent to SDR agent successfully!`);
+        
+        // Close the dialog if it's open
+        const dialog = document.getElementById('sdr-dialog-overlay');
+        if (dialog && dialog.style.display !== 'none') {
+            this.closeSdrDialog();
+        }
+    }
+    
+    showSdrDialog(business) {
+        console.log('Showing SDR dialog for business:', business.name);
+        
+        // Get the dialog element
+        const dialog = document.getElementById('sdr-dialog-overlay');
+        if (!dialog) {
+            console.error('SDR dialog overlay not found!');
+            return;
+        }
+        
+        // Populate business preview
+        const preview = document.getElementById('business-preview');
+        if (!preview) {
+            console.error('Business preview element not found!');
+            return;
+        }
+        
+        preview.innerHTML = `
+            <h4>${this.escapeHtml(business.name)}</h4>
+            ${business.city ? `<div class="detail"><i class="fas fa-map-marker-alt"></i><span>${this.escapeHtml(business.city)}</span></div>` : ''}
+            ${business.phone ? `<div class="detail"><i class="fas fa-phone"></i><span>${this.escapeHtml(business.phone)}</span></div>` : ''}
+            ${business.email ? `<div class="detail"><i class="fas fa-envelope"></i><span>${this.escapeHtml(business.email)}</span></div>` : ''}
+            ${business.description ? `<div class="detail"><i class="fas fa-info-circle"></i><span>${this.escapeHtml(business.description)}</span></div>` : ''}
+        `;
+        
+        // Store the business ID for later use
+        const confirmBtn = document.getElementById('confirm-sdr-btn');
+        if (!confirmBtn) {
+            console.error('Confirm SDR button not found!');
+            return;
+        }
+        confirmBtn.setAttribute('data-business-id', business.id);
+        
+        // Force the dialog to be visible and centered
+        dialog.style.setProperty('display', 'flex', 'important');
+        dialog.style.setProperty('position', 'fixed', 'important');
+        dialog.style.setProperty('top', '0', 'important');
+        dialog.style.setProperty('left', '0', 'important');
+        dialog.style.setProperty('width', '100vw', 'important');
+        dialog.style.setProperty('height', '100vh', 'important');
+        dialog.style.setProperty('z-index', '9999', 'important');
+        dialog.style.setProperty('background', 'rgba(0, 0, 0, 0.75)', 'important');
+        
+        console.log('Dialog should now be visible. Current display:', dialog.style.display);
+        console.log('Dialog computed style:', window.getComputedStyle(dialog).display);
+        
+        // Add event listener for ESC key
+        document.addEventListener('keydown', this.handleDialogKeydown);
+    }
+    
+    closeSdrDialog() {
+        const dialog = document.getElementById('sdr-dialog-overlay');
+        dialog.style.display = 'none';
+        
+        // Remove event listener
+        document.removeEventListener('keydown', this.handleDialogKeydown);
+    }
+    
+    handleDialogKeydown = (event) => {
+        if (event.key === 'Escape') {
+            this.closeSdrDialog();
+        }
+    }
+    
+    async confirmSendToSdr() {
+        const button = document.getElementById('confirm-sdr-btn');
+        const businessId = button.getAttribute('data-business-id');
+        
+        if (!businessId) {
+            console.error('No business ID found');
+            return;
+        }
+        
+        // Disable the button
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+        
+        try {
+            const formData = new FormData();
+            formData.append('business_id', businessId);
+            
+            const response = await fetch('/send_to_sdr', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok && result.success) {
+                console.log('Successfully sent to SDR:', result.message);
+                // The success message will be handled by the WebSocket update
+            } else {
+                console.error('Failed to send to SDR:', result.error);
+                this.showErrorToast(result.error || 'Failed to send to SDR agent');
+                
+                // Re-enable the button
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-paper-plane"></i> Send to SDR';
+            }
+        } catch (error) {
+            console.error('Error sending to SDR:', error);
+            this.showErrorToast('Network error: Failed to communicate with server');
+            
+            // Re-enable the button
+            button.disabled = false;
+            button.innerHTML = '<i class="fas fa-paper-plane"></i> Send to SDR';
+        }
+    }
+    
+    showSuccessToast(message) {
+        // Create toast notification
+        const toast = document.createElement('div');
+        toast.className = 'success-toast';
+        toast.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #10b981;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            z-index: 10001;
+            max-width: 400px;
+            font-weight: 500;
+        `;
+        toast.textContent = message;
+        
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.remove();
+        }, 4000);
+    }
 }
 
 // Global functions
@@ -570,6 +728,21 @@ function resetDashboard() {
     }
 }
 
+// Global dialog functions
+let dashboardManagerInstance = null;
+
+function closeSdrDialog() {
+    if (dashboardManagerInstance) {
+        dashboardManagerInstance.closeSdrDialog();
+    }
+}
+
+function confirmSendToSdr() {
+    if (dashboardManagerInstance) {
+        dashboardManagerInstance.confirmSendToSdr();
+    }
+}
+
 function toggleLog() {
     const logElement = document.querySelector('.activity-log');
     const toggleButton = document.querySelector('.toggle-log i');
@@ -586,7 +759,7 @@ function toggleLog() {
 // Initialize dashboard when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Initializing dashboard...');
-    new DashboardManager();
+    dashboardManagerInstance = new DashboardManager();
 });
 
 // Handle page visibility changes to manage WebSocket connection
