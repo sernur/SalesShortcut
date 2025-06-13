@@ -5,7 +5,8 @@ Outreach Caller Agent for making phone calls to convince business owners.
 from google.adk.agents.llm_agent import LlmAgent
 from ..config import MODEL
 from ..tools.phone_call import phone_call_function_tool
-from ..calbacks import phone_number_validation_callback
+from ..callbacks import phone_number_validation_callback
+from ..prompts import OUTREACH_CALLER_PROMPT
 
 
 outreach_caller_agent = LlmAgent(

@@ -6,6 +6,7 @@
     display: flex;
     flex-direction: column;
 }
+  
 
 /* Dashboard Header */
 .dashboard-header {
@@ -984,4 +985,121 @@
     .column-content {
         padding: 0.75rem;
     }
+}
+
+/* SDR Dialog Modal Styles */
+.modal-overlay {
+  display: none; /* hidden by default */
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay .modal-dialog {
+  background: white;
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-xl);
+  max-width: 600px;
+  width: 90%;
+  margin: 1rem;
+  display: flex;
+  flex-direction: column;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--gray-200);
+}
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: var(--gray-900);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.modal-close {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: var(--gray-600);
+}
+.modal-close:hover {
+  color: var(--gray-900);
+}
+.modal-content {
+  padding: 1.5rem;
+  color: var(--gray-800);
+}
+.business-preview {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--gray-200);
+  margin-bottom: 1rem;
+}
+.business-preview h4 {
+  margin: 0 0 0.5rem;
+  color: var(--gray-900);
+}
+.business-preview .detail {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--gray-700);
+  margin-bottom: 0.5rem;
+}
+.modal-message {
+  margin-bottom: 1rem;
+}
+.modal-message p {
+  margin-bottom: 0.5rem;
+}
+.modal-message .modal-subtitle {
+  font-weight: 600;
+  margin-top: 0.5rem;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--gray-200);
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--border-radius);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+  transform: translateY(-1px);
+}
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn-secondary {
+  background: transparent;
+  color: var(--gray-700);
+  border: 1px solid var(--gray-300);
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--border-radius);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.btn-secondary:hover {
+  background: var(--gray-100);
 }

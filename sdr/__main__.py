@@ -6,6 +6,7 @@ import common.config as defaults
 
 # Attempt to import A2A/ADK dependencies
 try:
+    import uvicorn
     from a2a.server.apps import A2AStarletteApplication
     from a2a.server.request_handlers import DefaultRequestHandler
     from a2a.server.tasks import InMemoryTaskStore
@@ -38,7 +39,7 @@ def main(host: str, port: int):
     """Runs the SDR ADK agent as an A2A server."""
     # Fallback to simple HTTP if ADK/A2A deps missing
     if not ADK_AVAILABLE:
-        logger.warning(f"!!!! ADK or A2A SDK dependencies not found ({missing_dep}), falling back to simple HTTP service.")
+        logger.warning(f"!!!! SDR ADK or A2A SDK dependencies not found ({missing_dep}).")
         return
 
     logger.info(f"Configuring SDR A2A server...")
@@ -119,7 +120,7 @@ def main(host: str, port: int):
         # Start the Server
         import uvicorn
         logger.info(f"Starting SDR A2A server on http://{host}:{port}/")
-        uvicorn.run(app_builder, host=host, port=port)
+        uvicorn.run(app_builder.build(), host=host, port=port)
     except Exception as e:
         logger.error(f"Failed to start SDR A2A server: {e}")
         raise

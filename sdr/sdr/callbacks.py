@@ -14,7 +14,10 @@ import httpx
 import common.config as config
 
 from google.adk.agents.callback_context import CallbackContext
+from google.adk.tools.tool_context import ToolContext
+from google.adk.tools.base_tool import BaseTool
 from google.genai import types as genai_types
+
 
 logger = logging.getLogger(__name__)
 
@@ -175,34 +178,47 @@ def validate_us_phone_number(phone_number: str) -> Dict[str, Any]:
     }
 
 
-async def phone_number_validation_callback(tool_input: Dict[str, Any]) -> Dict[str, Any]:
+# CORRECTED: Removed the extra 'def' keyword
+async def phone_number_validation_callback(
+    tool: BaseTool, args: Dict[str, Any], tool_context: ToolContext
+) -> Optional[Dict]:
     """
-    Before-tool callback to validate phone number format.
+    Before-tool callback to validate phone number format and modify args if needed.
+    """
     
-    Args:
-        tool_input: The input parameters for the phone_call_tool
-        
-    Returns:
-        Modified tool input with validated/normalized phone number
-    """
-    # Handle both old and new parameter names for backward compatibility
-    destination = tool_input.get("destination") or tool_input.get("phone_number", "")
+    tool_name = tool.name # Get the name of the tool being called
+    
+    # Only apply this callback to the phone call tool (or its test version)
+    if tool_name not in ["phone_call_tool", "phone_call_tool_test"]:
+        return None # Do nothing if it's not the relevant tool
+
+    # The phone number is expected in the 'destination' argument for the phone_call_tool
+    # or 'phone_number' if using an older signature or a different tool.
+    destination = args.get("destination") or args.get("phone_number", "")
     
     if not destination:
-        raise ValueError("Missing destination phone number")
-    
+        # If no destination is provided, let the tool handle the error or raise one here.
+        # For a callback, returning None means proceed with original args.
+        # If you want to block the tool from running, return a dict with "result".
+        logger.warning("No destination phone number found in tool arguments.")
+        return None # Or raise ValueError("Missing destination phone number") if you want to explicitly block
+
     validation_result = validate_us_phone_number(destination)
     
     if not validation_result["valid"]:
         logger.error(f"Phone number validation failed: {validation_result['error']}")
-        raise ValueError(f"Phone number validation failed: {validation_result['error']}")
+        # When returning a dictionary, the tool call is skipped and this result is used.
+        return {"result": f"Phone number validation failed: {validation_result['error']}"}
     
-    # Update the destination with the normalized version
-    tool_input["destination"] = validation_result["normalized"]
-    # Remove old parameter name if it exists
-    if "phone_number" in tool_input:
-        del tool_input["phone_number"]
-    
-    logger.info(f"Phone number normalized: {destination} -> {validation_result['normalized']}")
-    
-    return tool_input
+    # If valid, update the args with the normalized version
+    normalized_number = validation_result["normalized"]
+    if normalized_number != destination: # Only modify if a change occurred
+        logger.info(f"Phone number normalized: {destination} -> {normalized_number}")
+        args["destination"] = normalized_number
+        # If your tool also uses 'phone_number', you might want to update or remove it too
+        if "phone_number" in args:
+            args["phone_number"] = normalized_number
+            
+    # Return None to indicate that the tool execution should proceed with the (potentially modified) args.
+    return None
+
