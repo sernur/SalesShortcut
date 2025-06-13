@@ -21,9 +21,7 @@ def send_update_to_ui(outreach_data: dict):
     """
     Sends an outreach update to the UI client's /agent_callback endpoint.
     """
-    ui_client_url = os.environ.get(
-        "UI_CLIENT_SERVICE_URL", config.DEFAULT_UI_CLIENT_URL
-    ).rstrip("/")
+    ui_client_url = "http://127.0.0.1:8501".rstrip("/")
     callback_endpoint = f"{ui_client_url}/agent_callback"
 
     # Create a copy of the outreach_data to modify it for UI client's validation
