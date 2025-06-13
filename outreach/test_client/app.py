@@ -153,26 +153,29 @@ async def call_outreach_agent_a2a(task_type: str, task_data: dict[str, Any], ses
             )
 
             # Send request to Outreach
-            business_logger.info(f"Sending A2A request to Outreach: {outreach_data}")
+            business_logger.info(f"\n Sending A2A request to Outreach: {outreach_data}")
             response: SendMessageResponse = await a2a_client.send_message(sdk_request)
             root_response_part = response.root
-            business_logger.info(f"Received A2A response from Outreach: {root_response_part}")
+            business_logger.info(f"\n Received A2A response from Outreach: {root_response_part}")
 
             if isinstance(root_response_part, JSONRPCErrorResponse):
                 actual_error = root_response_part.error
                 business_logger.error(
-                    f"A2A Error from Outreach: {actual_error.code} - {actual_error.message}"
+                    f"\n A2A Error from Outreach: {actual_error.code} - {actual_error.message}"
                 )
                 outcome["error"] = f"A2A Error: {actual_error.code} - {actual_error.message}"
                 
             elif isinstance(root_response_part, SendMessageSuccessResponse):
                 task_result: A2ATask = root_response_part.result
                 business_logger.info(
-                    f"Outreach task {task_result.id} completed with state: {task_result.status.state}"
+                    f"\n Outreach task {task_result.id} completed with state: {task_result.status.state}"
                 )
 
                 # Extract outreach results from artifacts
                 if task_result.artifacts:
+                    business_logger.info(
+                        f"Found {task_result.artifacts} artifacts in Outreach response"
+                    )
                     outreach_results_artifact = next(
                         (
                             a

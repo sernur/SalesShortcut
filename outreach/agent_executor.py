@@ -50,7 +50,7 @@ class OutreachAgentExecutor(AgentExecutor):
         outreach_target: str | None = None
         outreach_type: str | None = None
         outreach_message: str | None = None
-        ui_client_url = DEFAULT_UI_CLIENT_URL
+        ui_client_url = "http://127.0.0.1:8501"
 
         if context.message and context.message.parts:
             for part_union in context.message.parts:
@@ -110,7 +110,7 @@ class OutreachAgentExecutor(AgentExecutor):
         }
         
         if outreach_type == "phone":
-            llm_prompt_text = f"PHONE CALL TASK: Use the phone_call_tool_test to call {outreach_target} with this script: '{outreach_message}'. You must use the tool, do not just respond with text."
+            llm_prompt_text = f"PHONE CALL TASK: Use the phone_call_tool to call {outreach_target} with this script: '{outreach_message}'. You must use the tool, do not just respond with text."
         elif outreach_type == "email":
             llm_prompt_text = f"EMAIL TASK: Use the message_email_tool_test to send an email to {outreach_target} with this content: '{outreach_message}'. You must use the tool, do not just respond with text."
         else:
@@ -119,13 +119,11 @@ class OutreachAgentExecutor(AgentExecutor):
         adk_content = genai_types.Content(
             parts=[
                 genai_types.Part(text=llm_prompt_text),
+                genai_types.Part(text=json.dumps(agent_input_dict)),
             ]
         )
-        # Log the content being sent to the ADK agent
-        logger.info(f"Task {context.task_id}: ADK Agent input content: {adk_content}")
-        
         # [Rest of the session handling code remains the same...]
-        session_id_for_adk = context.context_id
+        session_id_for_adk = context.context_id        
         logger.info(f"Task {context.task_id}: Using ADK session_id: '{session_id_for_adk}' for outreach: '{outreach_target}'")
 
         session: Session | None = None

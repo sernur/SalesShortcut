@@ -25,7 +25,7 @@ endif
 help:
 	@echo "SalesShortcut A2A Project - Available Commands:"
 	@echo ""
-	@echo "  make deploy_local               - Deploy all services locally"
+	@echo "  make deploy_local               - Deploy all services locally (includes Outreach test client)"
 	@echo "  make deploy_cloud               - Deploy all services to cloud"
 	@echo "  make test_local                 - Run test deployment (UI Client + Lead Manager)"
 	@echo "  make clean                      - Kill all running services"
@@ -123,6 +123,7 @@ clean:
 	@pkill -f "python -m calendar_assistant" || true
 	@pkill -f "python -m outreach" || true
 	@pkill -f "python -m sdr" || true
+	@pkill -f "uvicorn app:app" || true
 	@echo "✅ All services stopped"
 
 setup:
