@@ -665,6 +665,8 @@ class DashboardManager {
             
             if (response.ok && result.success) {
                 console.log('Successfully sent to SDR:', result.message);
+                // Close the dialog on success
+                this.closeSdrDialog();
                 // The success message will be handled by the WebSocket update
             } else {
                 console.error('Failed to send to SDR:', result.error);

@@ -20,11 +20,11 @@ def google_maps_search(city: str) -> dict[str, Any]:
     """
     mock_results = [
             {
-                "name": f"Business G1 in {city}",
-                "address": f"123 Main St, {city}, State, 12345",
-                "phone": "555-123-4567",
-                "website": "https://www.business1.com",
-                "category": "Restaurant",
+                "name": f"The Sportsman in {city}",
+                "address": f"129 N Main St, {city}, UT, 84321",
+                "phone": "435-317-3849",
+                "website": "",
+                "category": "Sporting goods store",
                 "rating": 4.5
             },
             {
