@@ -316,6 +316,42 @@
         </div>
     </div>
 
+    <!-- SDR Dialog -->
+    <div class="modal-overlay" id="sdr-dialog-overlay" style="display: none;" onclick="closeSdrDialog()">
+        <div class="modal-dialog" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-tie"></i> Send to SDR Agent</h3>
+                <button class="modal-close" onclick="closeSdrDialog()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="business-preview" id="business-preview">
+                    <!-- Business details will be populated here -->
+                </div>
+                <div class="modal-message">
+                    <p>Do you want to send this lead to the SDR agent for engagement and qualification?</p>
+                    <p class="modal-subtitle">The SDR agent will:</p>
+                    <ul>
+                        <li>Contact the business via phone or email</li>
+                        <li>Qualify the lead based on your criteria</li>
+                        <li>Update you on the engagement status</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="closeSdrDialog()">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </button>
+                <button class="btn-primary" id="confirm-sdr-btn" onclick="confirmSendToSdr()">
+                    <i class="fas fa-paper-plane"></i>
+                    Send to SDR
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', path='js/dashboard.js') }}"></script>
 </body>
 </html>
