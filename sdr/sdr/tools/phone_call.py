@@ -284,8 +284,24 @@ async def _make_real_call(
         result["error"] = str(e)
         return result
 
+async def phone_call(business_data: dict[str, Any], tool_context: ToolContext) -> dict[str, Any]:
+    """
+    Function for calling a Business to discuss website development.
 
-# Extract key information with flexible key handling
+    Args:
+        business_data (dict[str, Any]): The business data containing phone number and other details.
+        tool_context (ToolContext): The context containing all necessary information for the call.
+    
+    Returns:
+        A dictionary containing test call results
+    """
+    
+    print("\n" + "="*80)
+    print("🔍 PHONE CALL FUNCTION DEBUG START")
+    print("="*80)
+    debug_info = {}
+    
+    # Extract key information with flexible key handling
     if business_data:
         debug_info["business_data"] = business_data
         business_name = business_data.get('name', 'Unknown Business')
@@ -400,6 +416,7 @@ async def _make_real_call(
     print("="*80 + "\n")
     
     return result
+
 
 # High level tool definition for phone call
 phone_call_tool = FunctionTool(func=phone_call)
