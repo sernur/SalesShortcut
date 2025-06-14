@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 import logging
 
-from google.adk.tools import FunctionTool
+from google.adk.tools import FunctionTool, ToolContext
 from ..config import ELEVENLABS_API_KEY, ELEVENLABS_AGENT_ID, ELEVENLABS_PHONE_NUMBER_ID
 
 logger = logging.getLogger(__name__)
@@ -450,7 +450,8 @@ async def phone_call_tool(
 
 async def phone_call_tool_test(
     destination: str,
-    prompt: str
+    prompt: str,
+    tool_context: ToolContext
 ) -> Dict[str, Any]:
     """
     Test version of the phone call tool for outreach activities.
@@ -462,6 +463,10 @@ async def phone_call_tool_test(
     Returns:
         A dictionary containing test call results
     """
+    # Log all tool_context in json
+    tool_context_json = tool_context.to_dict()
+    logger.info(f"Tool context for `phone_call_tool_test`: {json.dumps(tool_context_json, indent=2)}")
+    logger.info(f"Starting phone call tool test to {destination} with prompt: {prompt}")
     # Sleep for 3 seconds to simulate processing time
     await asyncio.sleep(3)
     
@@ -478,6 +483,7 @@ async def phone_call_tool_test(
             {"role": "agent", "message": "We can help you build a professional website that attracts more customers and increases your online presence."},
             {"role": "user", "message": "That sounds interesting, can you send me more details via email?"},
             {"role": "agent", "message": "Sure, I will send you an email with all the details right away."}
+            {"role": "user", "message": "Great, I will look forward to it. Bye!"}
         ],
         "summary": f"[TEST] Call to {destination} completed successfully.",
         "timestamp": datetime.now().isoformat()
