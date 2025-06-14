@@ -11,24 +11,26 @@ from a2a.types import DataPart, Part, TaskState
 from common.config import DEFAULT_SDR_ARTIFACT_NAME, DEFAULT_UI_CLIENT_URL
 from google.adk import Runner
 from google.adk.sessions import InMemorySessionService, Session
+from google.adk.artifacts import InMemoryArtifactService
 from google.genai import types as genai_types
 
 from .sdr.agent import sdr_agent
 
 logger = logging.getLogger(__name__)
 
-
 class SDRAgentExecutor(AgentExecutor):
     """Executes the SDR ADK agent logic in response to A2A requests."""
 
     def __init__(self):
         self._adk_agent = sdr_agent
+        # IMPORTANT: Add artifact_service to the Runner initialization
         self._adk_runner = Runner(
             app_name="sdr_adk_runner",
             agent=self._adk_agent,
             session_service=InMemorySessionService(),
+            artifact_service=InMemoryArtifactService(),
         )
-        logger.info("SDRAgentExecutor initialized with ADK Runner.")
+        logger.info("SDRAgentExecutor initialized with ADK Runner and artifact service.")
 
     async def execute(self, context: RequestContext, event_queue: EventQueue):
         task_updater = TaskUpdater(event_queue, context.task_id, context.context_id)
@@ -84,12 +86,6 @@ class SDRAgentExecutor(AgentExecutor):
             )
             return
 
-        # Prepare input for ADK Agent with clear structure
-        agent_input_dict = {
-            "business_data": business_data,
-            "ui_client_url": ui_client_url,
-            "operation": "sdr_outreach"
-        }
         
         # Create a clear user message for the agent
         business_name = business_data.get("name", "Unknown Business")
@@ -99,7 +95,11 @@ class SDRAgentExecutor(AgentExecutor):
         adk_content = genai_types.Content(
             parts=[
                 genai_types.Part(text=user_message),
-                genai_types.Part(text=json.dumps(agent_input_dict))
+                genai_types.Part(text=json.dumps({
+                    "business_data": business_data, 
+                    "ui_client_url": ui_client_url,
+                    "operation": "sdr_outreach"
+                }))
             ]
         )
 
@@ -155,22 +155,52 @@ class SDRAgentExecutor(AgentExecutor):
             logger.info(f"Task {context.task_id}: Calling ADK run_async for business: {business_name}")
             final_result = {"status": "completed", "business_name": business_name, "sdr_result": {}}
             
+            # Collect all results from the agent pipeline
+            all_events = []
+            phone_call_result = None
+            
             async for event in self._adk_runner.run_async(
                 user_id="a2a_user",
                 session_id=session_id_for_adk,
                 new_message=adk_content,
             ):
+                all_events.append(event)
+                logger.info(f"Task {context.task_id}: ADK Event: {event}")
+                
+                # Capture function call results (like phone_call)
+                if event.content and event.content.parts:
+                    for part in event.content.parts:
+                        # Look for function calls
+                        if hasattr(part, 'function_call') and part.function_call:
+                            function_name = part.function_call.name
+                            logger.info(f"Task {context.task_id}: Function call detected: {function_name}")
+                            
+                            # Capture phone call results
+                            if function_name == "phone_call":
+                                phone_call_result = part.function_call.args
+                                logger.info(f"Task {context.task_id}: Phone call result captured")
+                                
+                            # Look for final SDR results
+                            elif function_name == "final_sdr_results":
+                                sdr_result = part.function_call.args.get("sdr_result", {})
+                                final_result["sdr_result"] = sdr_result
+                                logger.info(f"Task {context.task_id}: SDR process completed for {business_name}")
+                        
+                        # Also capture text responses
+                        elif hasattr(part, "text") and part.text:
+                            final_result["message"] = part.text
+                
+                # For final responses, ensure we have all the data
                 if event.is_final_response():
-                    if event.content and event.content.parts:
-                        # Look for function calls with SDR results
-                        for part in event.content.parts:
-                            if hasattr(part, 'function_call') and part.function_call:
-                                if part.function_call.name == "final_sdr_results":
-                                    sdr_result = part.function_call.args.get("sdr_result", {})
-                                    final_result["sdr_result"] = sdr_result
-                                    logger.info(f"Task {context.task_id}: SDR process completed for {business_name}")
-                            elif hasattr(part, "text") and part.text:
-                                final_result["message"] = part.text
+                    logger.info(f"Task {context.task_id}: Final response received")
+
+            # Add phone call result to final result if we captured it
+            if phone_call_result:
+                final_result["phone_call_result"] = phone_call_result
+                logger.info(f"Task {context.task_id}: Added phone call result to final output")
+
+            # Log the complete final result
+            logger.info(f"Task {context.task_id}: Complete final result: {json.dumps(final_result, indent=2)}")
 
             task_updater.add_artifact(
                 parts=[Part(root=DataPart(data=final_result))],

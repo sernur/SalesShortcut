@@ -568,9 +568,9 @@ class DashboardManager {
         this.addActivityLogEntry('sdr', data.message, data.timestamp);
         this.showSuccessToast(`${data.business_name} sent to SDR agent successfully!`);
         
-        // Close the dialog if it's open
+        // Close the dialog if it's open and visible
         const dialog = document.getElementById('sdr-dialog-overlay');
-        if (dialog && dialog.style.display !== 'none') {
+        if (dialog && !dialog.classList.contains('hidden')) {
             this.closeSdrDialog();
         }
     }
@@ -608,15 +608,8 @@ class DashboardManager {
         }
         confirmBtn.setAttribute('data-business-id', business.id);
         
-        // Force the dialog to be visible and centered
-        dialog.style.setProperty('display', 'flex', 'important');
-        dialog.style.setProperty('position', 'fixed', 'important');
-        dialog.style.setProperty('top', '0', 'important');
-        dialog.style.setProperty('left', '0', 'important');
-        dialog.style.setProperty('width', '100vw', 'important');
-        dialog.style.setProperty('height', '100vh', 'important');
-        dialog.style.setProperty('z-index', '9999', 'important');
-        dialog.style.setProperty('background', 'rgba(0, 0, 0, 0.75)', 'important');
+        // Show the dialog by removing the hidden class
+        dialog.classList.remove('hidden');
         
         console.log('Dialog should now be visible. Current display:', dialog.style.display);
         console.log('Dialog computed style:', window.getComputedStyle(dialog).display);
@@ -626,11 +619,33 @@ class DashboardManager {
     }
     
     closeSdrDialog() {
+        console.log('DashboardManager.closeSdrDialog() called');
         const dialog = document.getElementById('sdr-dialog-overlay');
-        dialog.style.display = 'none';
+        console.log('Dialog element:', dialog);
+        console.log('Dialog classes before:', dialog ? dialog.className : 'dialog not found');
+        
+        if (dialog) {
+            // Hide the dialog by adding the hidden class
+            dialog.classList.add('hidden');
+            console.log('Hidden class added');
+            console.log('Dialog classes after:', dialog.className);
+            console.log('Dialog computed style after change:', window.getComputedStyle(dialog).display);
+            
+            // Reset button state if it exists
+            const button = document.getElementById('confirm-sdr-btn');
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-paper-plane"></i> Send to SDR';
+                button.removeAttribute('data-business-id');
+                console.log('Button state reset');
+            }
+        } else {
+            console.error('Dialog element not found!');
+        }
         
         // Remove event listener
         document.removeEventListener('keydown', this.handleDialogKeydown);
+        console.log('Event listener removed');
     }
     
     handleDialogKeydown = (event) => {
@@ -645,6 +660,7 @@ class DashboardManager {
         
         if (!businessId) {
             console.error('No business ID found');
+            this.closeSdrDialog();
             return;
         }
         
@@ -661,28 +677,50 @@ class DashboardManager {
                 body: formData
             });
             
+            if (!response.ok) {
+                // Handle HTTP errors
+                const errorText = await response.text();
+                let errorMessage = 'Failed to send to SDR agent';
+                try {
+                    const errorResult = JSON.parse(errorText);
+                    errorMessage = errorResult.error || errorMessage;
+                } catch (e) {
+                    errorMessage = `Server error: ${response.status} ${response.statusText}`;
+                }
+                
+                console.error('HTTP error sending to SDR:', errorMessage);
+                this.showErrorToast(errorMessage);
+                
+                // Re-enable the button and close dialog
+                button.disabled = false;
+                button.innerHTML = '<i class="fas fa-paper-plane"></i> Send to SDR';
+                this.closeSdrDialog();
+                return;
+            }
+            
             const result = await response.json();
             
-            if (response.ok && result.success) {
+            if (result.success) {
                 console.log('Successfully sent to SDR:', result.message);
-                // Close the dialog on success
+                // Close the dialog on success - WebSocket will handle success message
                 this.closeSdrDialog();
-                // The success message will be handled by the WebSocket update
             } else {
                 console.error('Failed to send to SDR:', result.error);
                 this.showErrorToast(result.error || 'Failed to send to SDR agent');
                 
-                // Re-enable the button
+                // Re-enable the button and close dialog
                 button.disabled = false;
                 button.innerHTML = '<i class="fas fa-paper-plane"></i> Send to SDR';
+                this.closeSdrDialog();
             }
         } catch (error) {
-            console.error('Error sending to SDR:', error);
+            console.error('Network error sending to SDR:', error);
             this.showErrorToast('Network error: Failed to communicate with server');
             
-            // Re-enable the button
+            // Re-enable the button and close dialog
             button.disabled = false;
             button.innerHTML = '<i class="fas fa-paper-plane"></i> Send to SDR';
+            this.closeSdrDialog();
         }
     }
     
@@ -734,8 +772,12 @@ function resetDashboard() {
 let dashboardManagerInstance = null;
 
 function closeSdrDialog() {
+    console.log('Global closeSdrDialog called');
     if (dashboardManagerInstance) {
+        console.log('Calling dashboardManagerInstance.closeSdrDialog()');
         dashboardManagerInstance.closeSdrDialog();
+    } else {
+        console.error('dashboardManagerInstance is null!');
     }
 }
 

@@ -133,7 +133,7 @@ async def _make_real_call(
     system_prompt: str,
     first_message: str,
     poll_interval: float = 1.0
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Place an actual outbound call via ElevenLabs and return the conversation transcript.
     
@@ -285,212 +285,121 @@ async def _make_real_call(
         return result
 
 
-async def phone_call_tool(
-    destination: str,
-    prompt: str
-) -> Dict[str, Any]:
-    """
-    Phone call tool for outreach activities using ElevenLabs Conversational AI.
-    
-    Args:
-        destination: The phone number to call (E.164 format recommended)
-        prompt: The complete prompt/instruction for the call agent
+# Extract key information with flexible key handling
+    if business_data:
+        debug_info["business_data"] = business_data
+        business_name = business_data.get('name', 'Unknown Business')
         
-    Returns:
-        A dictionary containing call results and categorization
-    """
+        # Handle both 'phone' and 'phone_number' keys
+        business_phone = (
+            business_data.get('phone') or 
+            business_data.get('phone_number') or 
+            'No phone available'
+        )
+        
+        business_email = business_data.get('email', 'No email available')
+        business_city = business_data.get('city', 'Unknown City')
+        
+        debug_info["extracted_phone"] = business_phone
+        
+        print(f"\n🎯 EXTRACTED BUSINESS INFORMATION:")
+        print(f"   📝 Name: {business_name}")
+        print(f"   📞 Phone: {business_phone}")
+        print(f"   📧 Email: {business_email}")
+        print(f"   🏙️ City: {business_city}")
+        print(f"   🔍 Keys in business_data: {list(business_data.keys())}")
+        
+        # Check if phone number is usable for calling
+        if business_phone and business_phone != 'No phone available':
+            print(f"\n✅ PHONE NUMBER READY FOR CALLING: {business_phone}")
+        else:
+            print(f"\n❌ NO VALID PHONE NUMBER FOUND")
+    else:
+        print(f"\n❌ CRITICAL: No business_data found!")
+        business_name = 'Unknown Business'
+        business_phone = 'No phone available'
+        business_email = 'No email available'
     
-    # Internal configuration
-    max_duration_minutes = 5
-    call_categories = ["agreed_for_getting_email_proposal", "not_interested", "call_later"]
-    
-    # Create call log file
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"phone_call_log_{timestamp}.json"
-    filepath = Path(filename)
-    
-    call_data = {
-        "destination": destination,
-        "prompt": prompt,
-        "max_duration_minutes": max_duration_minutes,
-        "status": "initiated",
-        "timestamp": datetime.now().isoformat(),
-        "call_type": "real_call",
-        "target_categories": call_categories
-    }
+    # Write comprehensive debug file
+    root_path = Path.cwd()
+    debug_file = root_path / "phone_call_debug_detailed.json"
     
     try:
-        # Initialize ElevenLabs client
-        client, convai = _init_elevenlabs_client()
-        
-        if not convai:
-            # Fallback to mock if ElevenLabs not available
-            logger.warning("ElevenLabs not available, using mock call")
-            call_data["call_type"] = "mock_call"
-            await asyncio.sleep(1)
-            
-            # Generate mock result with categorization
-            import random
-            mock_category = random.choice(call_categories)
-            
-            call_result = {
-                "status": "completed",
-                "duration_seconds": random.randint(120, 300),
-                "category": mock_category,
-                "transcript": [
-                    {"role": "agent", "message": prompt[:100] + "..."},
-                    {"role": "user", "message": "Hi, thanks for calling."},
-                    {"role": "agent", "message": "I'd like to discuss our solution that could help your business..."}
-                ],
-                "summary": f"[MOCK] Call completed to {destination}. Prospect categorized as: {mock_category}",
-                "call_type": "mock_call"
-            }
-            
-            # Add category-specific details
-            if mock_category == "agreed_for_getting_email_proposal":
-                call_result["next_action"] = "Send email proposal"
-                call_result["prospect_email"] = f"contact@{destination.replace('+1', '').replace('-', '')}.com"
-            elif mock_category == "not_interested":
-                call_result["next_action"] = "Mark as not interested"
-                call_result["reason"] = "Not a good fit for current needs"
-            else:  # call_later
-                call_result["next_action"] = "Schedule follow-up call"
-                call_result["callback_date"] = "2024-12-20"
-        else:
-            # Make real call using ElevenLabs
-            agent_id = ELEVENLABS_AGENT_ID
-            phone_number_id = ELEVENLABS_PHONE_NUMBER_ID
-            
-            if not agent_id or not phone_number_id:
-                raise ValueError("ElevenLabs agent_id and phone_number_id must be configured")
-            
-            # Enhanced system prompt with categorization instructions
-            system_prompt = f"""
-            {prompt}
-            
-            IMPORTANT CATEGORIZATION INSTRUCTIONS:
-            Your main goal is to categorize this call into one of these three categories based on the prospect's response:
-            
-            1. "agreed_for_getting_email_proposal" - Prospect is interested and wants to receive an email proposal
-            2. "not_interested" - Prospect is not interested in the offering
-            3. "call_later" - Prospect asks to be called back later or wants to think about it
-            
-            Keep the call focused and within {max_duration_minutes} minutes. 
-            At the end of the call, clearly determine which category the prospect falls into based on their responses.
-            """
-            
-            # Extract first message from prompt
-            first_message = prompt.split('\n')[0] if '\n' in prompt else prompt[:100] + "..."
-            
-            # Make the actual call
-            call_result = await _make_real_call(
-                convai=convai,
-                agent_id=agent_id,
-                phone_number_id=phone_number_id,
-                to_number=destination,
-                instruction=system_prompt,
-                first_message=first_message,
-                poll_interval=1.0
-            )
-
-            # Process the real call result and categorize
-            if call_result["status"] in ["done", "completed_successfully"]:
-                call_result["status"] = "completed"
-                
-                # Analyze transcript for categorization
-                category = "call_later"  # default
-                if call_result.get("transcript"):
-                    transcript_text = " ".join([turn["message"] for turn in call_result["transcript"]]).lower()
-                    
-                    # Simple keyword-based categorization
-                    if any(word in transcript_text for word in ["yes", "send", "email", "proposal", "interested"]):
-                        category = "agreed_for_getting_email_proposal"
-                        call_result["next_action"] = "Send email proposal"
-                    elif any(word in transcript_text for word in ["no", "not interested", "not a fit", "busy"]):
-                        category = "not_interested"
-                        call_result["next_action"] = "Mark as not interested"
-                    else:
-                        category = "call_later"
-                        call_result["next_action"] = "Schedule follow-up call"
-                
-                call_result["category"] = category
-                call_result["summary"] = f"Call completed to {destination}. Prospect categorized as: {category}"
-                
-            elif call_result["status"] == "failed":
-                call_result["category"] = "call_later"
-                call_result["summary"] = f"Call failed to {destination}. Will retry later."
-                call_result["next_action"] = "Retry call or try alternative contact method"
-        
-        call_data.update(call_result)
-        
-        # Write call log
-        await asyncio.to_thread(_write_call_log, filepath, call_data)
-        
-        return call_data
-        
+        with open(debug_file, 'w', encoding='utf-8') as f:
+            json.dump(debug_info, f, indent=2, ensure_ascii=False)
+        print(f"\n💾 Debug info written to: {debug_file}")
     except Exception as e:
-        logger.exception(f"Error during phone call to {destination}")
-        error_result = {
-            "status": "failed",
-            "category": "call_later",
-            "error": f"Error during phone call: {str(e)}",
-            "summary": f"Call to {destination} failed due to technical error",
-            "next_action": "Retry call or try alternative contact method",
-            "call_type": "error"
+        print(f"❌ Failed to write debug file: {e}")
+    
+    # Create mock conversation result
+    print(f"\n🎭 CREATING MOCK CONVERSATION RESULT")
+    print("-" * 50)
+    
+    # Mock conversation with the extracted data
+    mock_transcript = [
+        {
+            "role": "agent", 
+            "message": f"Hello, my name is Lexi from SalesShortcuts and I am calling {business_name} to discuss building a website for your business."
+        },
+        {
+            "role": "user", 
+            "message": "Hi, thanks for calling. How would it help my business?"
+        },
+        {
+            "role": "agent", 
+            "message": "We can help you build a professional website that attracts more customers and increases your online presence. Based on our research, we see that your business could really benefit from having an online store and better visibility in search results."
+        },
+        {
+            "role": "user", 
+            "message": "That sounds interesting, can you send me more details via email?"
+        },
+        {
+            "role": "agent", 
+            "message": f"Absolutely! I'll send you a detailed proposal to {business_email} with all the information about how we can help {business_name} grow online."
+        },
+        {
+            "role": "user", 
+            "message": "Great, I will look forward to it. Thanks for calling!"
+        },
+        {
+            "role": "agent", 
+            "message": "Thank you for your time! You'll receive the email within the next hour. Have a great day!"
         }
-        call_data.update(error_result)
-        
-        try:
-            await asyncio.to_thread(_write_call_log, filepath, call_data)
-        except:
-            pass
-            
-        return call_data
-
-
-async def phone_call_tool_test(
-    destination: str,
-    prompt: str,
-    tool_context: ToolContext
-) -> Dict[str, Any]:
-    """
-    Test version of the phone call tool for outreach activities.
+    ]
     
-    Args:
-        destination: The phone number to call (E.164 format recommended)
-        prompt: The complete prompt/instruction for the call agent
-        
-    Returns:
-        A dictionary containing test call results
-    """
-    # Log all tool_context in json
-    tool_context_json = tool_context.to_dict()
-    logger.info(f"Tool context for `phone_call_tool_test`: {json.dumps(tool_context_json, indent=2)}")
-    logger.info(f"Starting phone call tool test to {destination} with prompt: {prompt}")
-    # Sleep for 3 seconds to simulate processing time
-    await asyncio.sleep(3)
+    # Print the mock conversation to console
+    print("\n📞 MOCK CONVERSATION TRANSCRIPT:")
+    print("=" * 60)
+    for i, turn in enumerate(mock_transcript, 1):
+        role_icon = "🤖" if turn["role"] == "agent" else "👤"
+        print(f"{i}. {role_icon} {turn['role'].upper()}: {turn['message']}")
+    print("=" * 60)
     
-    # Mock conversation result
+    # Create final result
     result = {
         "id": f"test_phone_call_{int(time.time())}",
         "action_type": "phone_call",
-        "status": "test_completed",
-        "destination": destination,
-        "prompt": prompt,
-        "transcript": [
-            {"role": "agent", "message": "Hello, my name is Lexi from SalesShortcuts and I am calling to discuss the potential building website for your business."},
-            {"role": "user", "message": "Hi, thanks for calling. How it would help my business?"},
-            {"role": "agent", "message": "We can help you build a professional website that attracts more customers and increases your online presence."},
-            {"role": "user", "message": "That sounds interesting, can you send me more details via email?"},
-            {"role": "agent", "message": "Sure, I will send you an email with all the details right away."}
-            {"role": "user", "message": "Great, I will look forward to it. Bye!"}
-        ],
-        "summary": f"[TEST] Call to {destination} completed successfully.",
+        "status": "test_completed" if business_data else "error_no_business_data",
+        "business_data": business_data,
+        "business_name": business_name,
+        "destination": business_phone,
+        "transcript": mock_transcript,
+        "summary": f"[TEST] Call to {business_name} ({business_phone}) completed successfully. Customer interested in website proposal.",
+        "debug_info": debug_info,
         "timestamp": datetime.now().isoformat()
     }
     
-    logger.info(f"Phone call tool test completed: {result}")
+    print(f"\n🎯 FINAL RESULT SUMMARY:")
+    print(f"   Status: {result['status']}")
+    print(f"   Business: {business_name}")
+    print(f"   Phone: {business_phone}")
+    print(f"   Transcript Length: {len(mock_transcript)} turns")
+    
+    print("\n" + "="*80)
+    print("✅ PHONE CALL FUNCTION DEBUG COMPLETE")
+    print("="*80 + "\n")
+    
     return result
 
-
-phone_call_function_tool = FunctionTool(func=phone_call_tool_test)
+# High level tool definition for phone call
+phone_call_tool = FunctionTool(func=phone_call)

@@ -677,6 +677,10 @@
     animation: fadeIn 0.2s ease;
 }
 
+.modal-overlay.hidden {
+    display: none !important;
+}
+
 .modal-dialog {
     background: white !important;
     border-radius: var(--border-radius-lg) !important;

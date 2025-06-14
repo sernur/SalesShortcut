@@ -39,7 +39,7 @@ async def bigquery_upload(data: List[dict[str, Any]]) -> dict[str, Any]:
     num_records = len(data)
     
     # Create output file in current directory
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().isoformat()
     filename = f"bigquery_upload_{timestamp}.json"
     filepath = Path(filename)
     
