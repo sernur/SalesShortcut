@@ -46,7 +46,7 @@ async def message_email_tool(
     """
     
     # Create email log file
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().isoformat()
     filename = f"email_log_{timestamp}.json"
     filepath = Path(filename)
     
