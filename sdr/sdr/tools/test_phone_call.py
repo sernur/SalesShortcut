@@ -12,8 +12,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
 import logging
-from ..config import ELEVENLABS_API_KEY, ELEVENLABS_AGENT_ID, ELEVENLABS_PHONE_NUMBER_ID
-from ..prompts import CALLER_PROMPT
+import sys
+from pathlib import Path
+
+# Add the parent directory to the path to allow imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from config import ELEVENLABS_API_KEY, ELEVENLABS_AGENT_ID, ELEVENLABS_PHONE_NUMBER_ID
+from prompts import CALLER_PROMPT
+from elevenlabs import ElevenLabs
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -48,11 +55,8 @@ TEST_SYSTEM_PROMPT = CALLER_PROMPT.format(
 FIRST_MESSAGE = "Hello! This is Lexi from Web Solutions Inc. I hope I'm not catching you at a bad time. I'm calling to let you know about our website development services for small businesses. Do you have just a quick moment to chat?"
 
 # ============================================================================
-# CONFIGURATION FROM ENVIRONMENT (these should be set in your environment)
 # ============================================================================
-
-
-
+# VALIDATION AND UTILITY FUNCTIONS
 # ============================================================================
 # VALIDATION AND UTILITY FUNCTIONS
 # ============================================================================
@@ -104,6 +108,7 @@ def _init_elevenlabs_client():
             
         client = ElevenLabs(api_key=api_key)
         convai = client.conversational_ai
+    
         return client, convai
     except ImportError:
         logger.error("ElevenLabs library not available. Please install: pip install elevenlabs")
@@ -123,67 +128,43 @@ async def make_test_call(
     poll_interval: float = 1.0
 ) -> dict[str, Any]:
     """
-    Place a test outbound call via ElevenLabs and return the conversation transcript.
-    
-    Args:
-        to_number: E.164-formatted destination phone number
-        system_prompt: System prompt guiding agent behavior
-        first_message: First message the agent will say
-        poll_interval: Seconds between status checks
-
-    Returns:
-        A dictionary containing call status, transcript, and debug information
+    Place a test outbound call via ElevenLabs Conversational-AI → Twilio
+    and return its transcript & metadata.
     """
     result = {
         "status": "initializing",
         "transcript": [],
         "debug_info": [],
         "error": None,
-        "conversation_id": None
+        "conversation_id": None,
     }
-    
-    def add_debug(msg):
+    def add(msg: str):
         result["debug_info"].append(msg)
         logger.info(msg)
-    
-    # Validate environment variables
-    if not ELEVENLABS_API_KEY:
-        error_msg = "ELEVENLABS_API_KEY environment variable is not set"
-        add_debug(f"ERROR: {error_msg}")
-        result["status"] = "error"
-        result["error"] = error_msg
-        return result
-    
-    if not ELEVENLABS_AGENT_ID:
-        error_msg = "ELEVENLABS_AGENT_ID environment variable is not set"
-        add_debug(f"ERROR: {error_msg}")
-        result["status"] = "error"
-        result["error"] = error_msg
-        return result
-        
-    if not ELEVENLABS_PHONE_NUMBER_ID:
-        error_msg = "ELEVENLABS_PHONE_NUMBER_ID environment variable is not set"
-        add_debug(f"ERROR: {error_msg}")
-        result["status"] = "error"
-        result["error"] = error_msg
-        return result
 
-    # Initialize ElevenLabs client
+    # --- sanity checks -----------------------------------------------------
+    for var, val in [
+        ("ELEVENLABS_API_KEY", ELEVENLABS_API_KEY),
+        ("ELEVENLABS_AGENT_ID", ELEVENLABS_AGENT_ID),
+        ("ELEVENLABS_PHONE_NUMBER_ID", ELEVENLABS_PHONE_NUMBER_ID),
+    ]:
+        if not val:
+            err = f"{var} environment variable is not set"
+            add(f"ERROR: {err}")
+            result.update(status="error", error=err)
+            return result
+
     client, convai = _init_elevenlabs_client()
     if not client or not convai:
-        error_msg = "Failed to initialize ElevenLabs client"
-        add_debug(f"ERROR: {error_msg}")
-        result["status"] = "error"
-        result["error"] = error_msg
+        err = "Failed to initialise ElevenLabs client"
+        add(f"ERROR: {err}")
+        result.update(status="error", error=err)
         return result
-    
-    add_debug(f"Initiating ElevenLabs call to: {to_number}")
-    add_debug(f"Using Agent ID: {ELEVENLABS_AGENT_ID}")
-    add_debug(f"Using Phone Number ID: {ELEVENLABS_PHONE_NUMBER_ID}")
 
+    # --- 1️⃣  start the call ----------------------------------------------
+    add(f"Initiating call → {to_number}")
     try:
-        # Initiate the call with prompt overrides
-        response = convai.twilio_outbound_call(
+        response = convai.twilio.outbound_call(      # ← new namespace!
             agent_id=ELEVENLABS_AGENT_ID,
             agent_phone_number_id=ELEVENLABS_PHONE_NUMBER_ID,
             to_number=to_number,
@@ -191,123 +172,61 @@ async def make_test_call(
                 "conversation_config_override": {
                     "agent": {
                         "prompt": {"prompt": system_prompt},
-                        "first_message": first_message
+                        "first_message": first_message,
                     }
                 }
-            }
+            },
         )
-        
-        # Extract conversation ID
-        conv_id = None
-        for attr in ['conversation_id', 'id', 'callSid']:
-            if hasattr(response, attr):
-                conv_id = getattr(response, attr)
-                add_debug(f"Found ID in '{attr}': {conv_id}")
-                break
-                
-        if not conv_id:
-            for attr_name in dir(response):
-                if attr_name.startswith('_'):
-                    continue
-                try:
-                    attr_value = getattr(response, attr_name)
-                    if isinstance(attr_value, str) and len(attr_value) > 8:
-                        add_debug(f"Using {attr_name} as conversation ID: {attr_value}")
-                        conv_id = attr_value
-                        break
-                except:
-                    pass
-                    
-        if not conv_id:
-            raise RuntimeError("Could not find a conversation ID in the response")
-
-        add_debug(f"Call initiated successfully. Conversation ID: {conv_id}")
-        result["status"] = "initiated"
-        result["conversation_id"] = conv_id
-
-        # Poll until the conversation is complete
-        add_debug("Polling for conversation completion...")
-        poll_count = 0
-        max_polls = 300  # 5 minutes max
-        
-        while poll_count < max_polls:
-            try:
-                details = convai.get_conversation(conv_id)
-                
-                status = None
-                if hasattr(details, 'status'):
-                    status = details.status
-                    add_debug(f"Polling status: {status} (poll #{poll_count + 1})")
-                    result["status"] = status
-                    if status in ("done", "failed", "completed_successfully", "ended"):
-                        add_debug(f"Conversation {status}.")
-                        break
-                else:
-                    add_debug("Could not determine conversation status. Breaking poll loop.")
-                    result["status"] = "unknown"
-                    break
-                    
-            except Exception as e:
-                add_debug(f"Error polling conversation: {str(e)}")
-                result["status"] = "error_polling"
-                result["error"] = str(e)
-                break
-
-            await asyncio.sleep(poll_interval)
-            poll_count += 1
-
-        if poll_count >= max_polls:
-            add_debug("Maximum polling time reached")
-            result["status"] = "timeout"
-
-        # Extract transcript
-        add_debug("Attempting to extract transcript...")
-        transcript_turns = []
-        
-        if hasattr(details, 'transcript') and details.transcript is not None:
-            transcript_turns = details.transcript
-        elif hasattr(details, 'turns') and details.turns is not None:
-            transcript_turns = details.turns
-        else:
-            for attr in dir(details):
-                if attr.startswith('_'):
-                    continue
-                try:
-                    value = getattr(details, attr)
-                    if isinstance(value, list) and len(value) > 0:
-                        transcript_turns = value
-                        break
-                except:
-                    pass
-
-        # Process transcript turns
-        formatted_transcript = []
-        for turn in transcript_turns:
-            role = "unknown"
-            if hasattr(turn, 'role'):
-                role = turn.role
-            
-            message = "unknown"
-            if hasattr(turn, 'message'):
-                msg = turn.message
-                if isinstance(msg, str):
-                    message = msg
-                elif hasattr(msg, 'text'):
-                    message = msg.text
-            elif hasattr(turn, 'text'):
-                message = turn.text
-                
-            formatted_transcript.append({"role": role, "message": message})
-            
-        result["transcript"] = formatted_transcript
-        add_debug(f"Extracted {len(formatted_transcript)} transcript turns")
+    except Exception as exc:
+        add(f"Error initiating call: {exc}")
+        result.update(status="error", error=str(exc))
         return result
 
-    except Exception as e:
-        add_debug(f"Error initiating call: {str(e)}")
-        result["status"] = "error"
-        result["error"] = str(e)
+    conv_id = getattr(response, "conversation_id", None) or getattr(response, "callSid", None)
+    if not conv_id:
+        err = "Conversation ID missing in outbound_call response"
+        add(f"ERROR: {err}")
+        result.update(status="error", error=err)
         return result
+
+    result.update(status="initiated", conversation_id=conv_id)
+    add(f"Call started (conversation_id = {conv_id})")
+
+    # --- 2️⃣  poll until finished -----------------------------------------
+    terminal = {"done", "failed"}
+    while True:
+        time.sleep(poll_interval)
+        try:
+            details = convai.conversations.get(conv_id)   # ← new helper!
+            status  = getattr(details, "status", "unknown")
+            result["status"] = status
+            add(f"Polling status: {status}")
+            if status in terminal:
+                break
+        except Exception as exc:
+            add(f"Error polling: {exc}")
+            result.update(status="error_polling", error=str(exc))
+            return result
+
+    # --- 3️⃣  extract transcript ------------------------------------------
+    turns = (
+        getattr(details, "transcript", None)
+        or getattr(details, "turns", None)
+        or []
+    )
+    formatted = []
+    for t in turns:
+        role = getattr(t, "role", "unknown")
+        msg  = (
+            t.message if hasattr(t, "message") else
+            getattr(t, "text", "unknown")
+        )
+        if hasattr(msg, "text"):  # ElevenLabs sometimes nests TextObject
+            msg = msg.text
+        formatted.append({"role": role, "message": msg})
+    result["transcript"] = formatted
+    return result
+
 
 # ============================================================================
 # MAIN TEST FUNCTION
@@ -355,9 +274,11 @@ async def run_phone_call_test():
     print(f"   🤖 Agent will say: \"{FIRST_MESSAGE[:60]}...\"")
     print(f"\n💰 Note: This will use ElevenLabs credits and may incur charges.")
     
-    confirm = input("\n❓ Do you want to proceed with the call? (yes/no): ").strip().lower()
-    if confirm not in ['yes', 'y']:
-        print("❌ Call cancelled by user.")
+    # Skip confirmation for non-interactive environments
+    import sys
+    if not sys.stdin.isatty():
+        print("\n⚠️ Running in non-interactive mode, skipping confirmation.")
+        print("❌ Call cancelled for safety in non-interactive mode.")
         return
     
     # Make the call

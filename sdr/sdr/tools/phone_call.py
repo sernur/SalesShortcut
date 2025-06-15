@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
 import logging
+from elevenlabs import ElevenLabs
 
 from google.adk.tools import FunctionTool, ToolContext
 from ..config import ELEVENLABS_API_KEY, ELEVENLABS_AGENT_ID, ELEVENLABS_PHONE_NUMBER_ID
@@ -17,15 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def validate_us_phone_number(phone_number: str) -> Dict[str, Any]:
-    """
-    Validate that the phone number is a valid US number for ElevenLabs.
-    
-    Args:
-        phone_number: Phone number to validate
-        
-    Returns:
-        Dict with validation result and normalized number
-    """
+    """Validate that the phone number is a valid US number for ElevenLabs."""
     import re
     
     # Remove all non-digit characters
@@ -61,49 +54,6 @@ def validate_us_phone_number(phone_number: str) -> Dict[str, Any]:
     }
 
 
-async def phone_number_validation_callback(tool_input: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Before-tool callback to validate phone number format.
-    
-    Args:
-        tool_input: The input parameters for the phone_call_tool
-        
-    Returns:
-        Modified tool input with validated/normalized phone number
-    """
-    # Handle both old and new parameter names for backward compatibility
-    destination = tool_input.get("destination") or tool_input.get("phone_number", "")
-    
-    if not destination:
-        raise ValueError("Missing destination phone number")
-    
-    validation_result = validate_us_phone_number(destination)
-    
-    if not validation_result["valid"]:
-        logger.error(f"Phone number validation failed: {validation_result['error']}")
-        raise ValueError(f"Phone number validation failed: {validation_result['error']}")
-    
-    # Update the destination with the normalized version
-    tool_input["destination"] = validation_result["normalized"]
-    # Remove old parameter name if it exists
-    if "phone_number" in tool_input:
-        del tool_input["phone_number"]
-    
-    logger.info(f"Phone number normalized: {destination} -> {validation_result['normalized']}")
-    
-    return tool_input
-
-
-def _write_call_log(filepath: Path, call_data: Dict[str, Any]) -> None:
-    """Helper function to write call log data to file."""
-    output_data = {
-        "timestamp": datetime.now().isoformat(),
-        "call_data": call_data
-    }
-    
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(output_data, f, indent=2, ensure_ascii=False)
-
 
 def _init_elevenlabs_client():
     """Initialize and return the ElevenLabs client and conversational AI subclient."""
@@ -116,170 +66,123 @@ def _init_elevenlabs_client():
             
         client = ElevenLabs(api_key=api_key)
         convai = client.conversational_ai
+    
         return client, convai
     except ImportError:
-        logger.warning("ElevenLabs library not available. Phone calls will be mocked.")
+        logger.error("ElevenLabs library not available. Please install: pip install elevenlabs")
         return None, None
     except Exception as e:
         logger.error(f"Failed to initialize ElevenLabs client: {e}")
         return None, None
 
 
-async def _make_real_call(
+async def _make_test_call(
     to_number: str,
     system_prompt: str,
+    first_message: str,
     poll_interval: float = 1.0
 ) -> dict[str, Any]:
     """
-    Place an actual outbound call via ElevenLabs and return the conversation transcript.
-    
-    Args:
-        to_number: E.164-formatted destination phone number
-        system_prompt: System prompt guiding agent behavior
-        poll_interval: Seconds between status checks
-
-    Returns:
-        A dictionary containing call status, transcript, and debug information
+    Place a test outbound call via ElevenLabs Conversational-AI → Twilio
+    and return its transcript & metadata.
     """
     result = {
         "status": "initializing",
         "transcript": [],
         "debug_info": [],
         "error": None,
-        "conversation_id": None
+        "conversation_id": None,
     }
-    
-    convai, client = _init_elevenlabs_client()
-    
-    def add_debug(msg):
+    def add(msg: str):
         result["debug_info"].append(msg)
         logger.info(msg)
-    agent_id = ELEVENLABS_AGENT_ID
-    phone_number_id = ELEVENLABS_PHONE_NUMBER_ID
-    
-    
-    add_debug(f"Initiating ElevenLabs call to: {to_number}")
-    add_debug(f"Using Agent ID: {agent_id}")
-    add_debug(f"Using Phone Number ID: {phone_number_id}")
 
+    # --- sanity checks -----------------------------------------------------
+    for var, val in [
+        ("ELEVENLABS_API_KEY", ELEVENLABS_API_KEY),
+        ("ELEVENLABS_AGENT_ID", ELEVENLABS_AGENT_ID),
+        ("ELEVENLABS_PHONE_NUMBER_ID", ELEVENLABS_PHONE_NUMBER_ID),
+    ]:
+        if not val:
+            err = f"{var} environment variable is not set"
+            add(f"ERROR: {err}")
+            result.update(status="error", error=err)
+            return result
+
+    client, convai = _init_elevenlabs_client()
+    if not client or not convai:
+        err = "Failed to initialise ElevenLabs client"
+        add(f"ERROR: {err}")
+        result.update(status="error", error=err)
+        return result
+
+    # --- 1️⃣  start the call ----------------------------------------------
+    add(f"Initiating call → {to_number}")
     try:
-        # Initiate the call with prompt overrides
-        response = convai.twilio_outbound_call(
-            agent_id=agent_id,
-            agent_phone_number_id=phone_number_id,
+        response = convai.twilio.outbound_call(      # ← new namespace!
+            agent_id=ELEVENLABS_AGENT_ID,
+            agent_phone_number_id=ELEVENLABS_PHONE_NUMBER_ID,
             to_number=to_number,
             conversation_initiation_client_data={
                 "conversation_config_override": {
                     "agent": {
                         "prompt": {"prompt": system_prompt},
-                        "first_message": first_message
+                        "first_message": first_message,
                     }
                 }
-            }
+            },
         )
-        
-        # Extract conversation ID
-        conv_id = None
-        for attr in ['conversation_id', 'id', 'callSid']:
-            if hasattr(response, attr):
-                conv_id = getattr(response, attr)
-                add_debug(f"Found ID in '{attr}': {conv_id}")
-                break
-                
-        if not conv_id:
-            for attr_name in dir(response):
-                if attr_name.startswith('_'):
-                    continue
-                try:
-                    attr_value = getattr(response, attr_name)
-                    if isinstance(attr_value, str) and len(attr_value) > 8:
-                        add_debug(f"Using {attr_name} as conversation ID: {attr_value}")
-                        conv_id = attr_value
-                        break
-                except:
-                    pass
-                    
-        if not conv_id:
-            raise RuntimeError("Could not find a conversation ID in the response")
-
-        add_debug(f"Call initiated successfully. Conversation ID: {conv_id}")
-        result["status"] = "initiated"
-        result["conversation_id"] = conv_id
-
-        # Poll until the conversation is complete
-        add_debug("Polling for conversation completion...")
-        while True:
-            try:
-                details = convai.get_conversation(conv_id)
-                
-                status = None
-                if hasattr(details, 'status'):
-                    status = details.status
-                    add_debug(f"Polling status: {status}")
-                    result["status"] = status
-                    if status in ("done", "failed", "completed_successfully", "ended"):
-                        add_debug(f"Conversation {status}.")
-                        break
-                else:
-                    add_debug("Could not determine conversation status. Breaking poll loop.")
-                    result["status"] = "unknown"
-                    break
-                    
-            except Exception as e:
-                add_debug(f"Error polling conversation: {str(e)}")
-                result["status"] = "error_polling"
-                result["error"] = str(e)
-                break
-
-            await asyncio.sleep(poll_interval)
-
-        # Extract transcript
-        add_debug("Attempting to extract transcript...")
-        transcript_turns = []
-        
-        if hasattr(details, 'transcript') and details.transcript is not None:
-            transcript_turns = details.transcript
-        elif hasattr(details, 'turns') and details.turns is not None:
-            transcript_turns = details.turns
-        else:
-            for attr in dir(details):
-                if attr.startswith('_'):
-                    continue
-                try:
-                    value = getattr(details, attr)
-                    if isinstance(value, list) and len(value) > 0:
-                        transcript_turns = value
-                        break
-                except:
-                    pass
-
-        # Process transcript turns
-        formatted_transcript = []
-        for turn in transcript_turns:
-            role = "unknown"
-            if hasattr(turn, 'role'):
-                role = turn.role
-            
-            message = "unknown"
-            if hasattr(turn, 'message'):
-                msg = turn.message
-                if isinstance(msg, str):
-                    message = msg
-                elif hasattr(msg, 'text'):
-                    message = msg.text
-            elif hasattr(turn, 'text'):
-                message = turn.text
-                
-            formatted_transcript.append({"role": role, "message": message})
-            
-        result["transcript"] = formatted_transcript
+    except Exception as exc:
+        add(f"Error initiating call: {exc}")
+        result.update(status="error", error=str(exc))
         return result
 
-    except Exception as e:
-        add_debug(f"Error initiating call: {str(e)}")
-        result["status"] = "error"
-        result["error"] = str(e)
+    conv_id = getattr(response, "conversation_id", None) or getattr(response, "callSid", None)
+    if not conv_id:
+        err = "Conversation ID missing in outbound_call response"
+        add(f"ERROR: {err}")
+        result.update(status="error", error=err)
         return result
+
+    result.update(status="initiated", conversation_id=conv_id)
+    add(f"Call started (conversation_id = {conv_id})")
+
+    # --- 2️⃣  poll until finished -----------------------------------------
+    terminal = {"done", "failed"}
+    while True:
+        time.sleep(poll_interval)
+        try:
+            details = convai.conversations.get(conv_id)   # ← new helper!
+            status  = getattr(details, "status", "unknown")
+            result["status"] = status
+            add(f"Polling status: {status}")
+            if status in terminal:
+                break
+        except Exception as exc:
+            add(f"Error polling: {exc}")
+            result.update(status="error_polling", error=str(exc))
+            return result
+
+    # --- 3️⃣  extract transcript ------------------------------------------
+    turns = (
+        getattr(details, "transcript", None)
+        or getattr(details, "turns", None)
+        or []
+    )
+    formatted = []
+    for t in turns:
+        role = getattr(t, "role", "unknown")
+        msg  = (
+            t.message if hasattr(t, "message") else
+            getattr(t, "text", "unknown")
+        )
+        if hasattr(msg, "text"):  # ElevenLabs sometimes nests TextObject
+            msg = msg.text
+        formatted.append({"role": role, "message": msg})
+    result["transcript"] = formatted
+    return result
+
+
 
 async def phone_call(business_data: dict[str, Any], proposal: str, tool_context: ToolContext) -> dict[str, Any]:
     """
@@ -315,10 +218,39 @@ async def phone_call(business_data: dict[str, Any], proposal: str, tool_context:
     log_to_file(f"[proposal] Proposal: {proposal}")
     
     debug_info = {}
+        
+    # Check environment variables
+    log_to_file(f"\n🔧 Checking environment variables...")
+    env_vars = {
+        "ELEVENLABS_API_KEY": "✅ Set" if ELEVENLABS_API_KEY else "❌ Missing",
+        "ELEVENLABS_AGENT_ID": "✅ Set" if ELEVENLABS_AGENT_ID else "❌ Missing", 
+        "ELEVENLABS_PHONE_NUMBER_ID": "✅ Set" if ELEVENLABS_PHONE_NUMBER_ID else "❌ Missing"
+    }
+    
+    for var, status in env_vars.items():
+        log_to_file(f"   {var}: {status}")
+    
+    missing_vars = [var for var, status in env_vars.items() if "❌" in status]
+    if missing_vars:
+        log_to_file(f"\n❌ Missing environment variables: {', '.join(missing_vars)}")
+        log_to_file("Please set these environment variables before running the test.")
+        return
+    
+    # Confirm before making the call
+    log_to_file(f"\n⚠️  ABOUT TO MAKE A REAL PHONE CALL!")
+    log_to_file(f"   📞 Calling: {normalized_number}")
+    log_to_file(f"   🤖 Agent will say: \"{FIRST_MESSAGE[:60]}...\"")
+    log_to_file(f"\n💰 Note: This will use ElevenLabs credits and may incur charges.")
+
+    # Make the call
+    log_to_file(f"\n🚀 Initiating call to {normalized_number}...")
+    log_to_file("⏳ This may take a few minutes depending on call duration...")
+    
     
     # Extract key information with flexible key handling
-    if business_data:
+    if business_data and proposal:
         debug_info["business_data"] = business_data
+        debug_info["proposal"] = proposal
         business_name = business_data.get('name', 'Unknown Business')
         
         # Handle both 'phone' and 'phone_number' keys
@@ -332,6 +264,34 @@ async def phone_call(business_data: dict[str, Any], proposal: str, tool_context:
         business_city = business_data.get('city', 'Unknown City')
         
         debug_info["extracted_phone"] = business_phone
+        
+        log_to_file(f"\n🔍 Validating phone number: {business_phone}")
+        validation = validate_us_phone_number(business_phone)
+
+        if not validation["valid"]:
+            log_to_file(f"❌ Phone number validation failed: {validation['error']}")
+            log_to_file("\n💡 Please edit business_phone in this script with a valid US phone number")
+            return
+
+        normalized_number = validation["normalized"]
+        log_to_file(f"✅ Phone number valid. Normalized: {normalized_number}")
+
+        FIRST_MESSAGE = "Hello!.. This is Lexi from Web Solutions Inc. I hope I'm not catching you at a bad time. I'm calling to let you know about our website development services for you. Do you have just a quick moment to chat?"
+
+        SYSTEM_PROMPT = CALLER_PROMPT.format(
+            business_data= json.dumps(business_data, indent=2),
+            proposal=proposal
+        )
+
+
+        start_time = time.time()
+        result = await make_test_call(
+               to_number=normalized_number,
+               system_prompt=SYSTEM_PROMPT,
+               first_message=FIRST_MESSAGE,
+               poll_interval=2.0
+        )
+        end_time = time.time()
         
         log_to_file("")
         log_to_file("🎯 EXTRACTED BUSINESS INFORMATION:")
@@ -370,88 +330,7 @@ async def phone_call(business_data: dict[str, Any], proposal: str, tool_context:
     log_to_file("")
     log_to_file("🎭 CREATING MOCK CONVERSATION RESULT")
     log_to_file("-" * 50)
-    
-    # Mock conversation with the extracted data
-    mock_transcript = [
-        {
-            "role": "agent", 
-            "message": f"Hello, my name is Lexi from SalesShortcuts and I am calling {business_name} to discuss building a website for your business."
-        },
-        {
-            "role": "user", 
-            "message": "Hi, thanks for calling. How would it help my business?"
-        },
-        {
-            "role": "agent", 
-            "message": "We can help you build a professional website that attracts more customers and increases your online presence. Based on our research, we see that your business could really benefit from having an online store and better visibility in search results."
-        },
-        {
-            "role": "user", 
-            "message": "That sounds interesting, can you send me more details via email?"
-        },
-        {
-            "role": "agent", 
-            "message": f"Absolutely! I'll send you a detailed proposal to {business_email} with all the information about how we can help {business_name} grow online."
-        },
-        {
-            "role": "user", 
-            "message": "Great, I will look forward to it. Thanks for calling!"
-        },
-        {
-            "role": "agent", 
-            "message": "Thank you for your time! You'll receive the email within the next hour. Have a great day!"
-        }
-    ]
-    
-    # Log the mock conversation to file
-    log_to_file("")
-    log_to_file("📞 MOCK CONVERSATION TRANSCRIPT:")
-    log_to_file("=" * 60)
-    for i, turn in enumerate(mock_transcript, 1):
-        role_icon = "🤖" if turn["role"] == "agent" else "👤"
-        log_to_file(f"{i}. {role_icon} {turn['role'].upper()}: {turn['message']}")
-    log_to_file("=" * 60)
-    
-    # Create final result
-    result = {
-        "id": f"test_phone_call_{int(time.time())}",
-        "action_type": "phone_call",
-        "status": "test_completed" if business_data else "error_no_business_data",
-        "business_data": business_data,
-        "business_name": business_name,
-        "destination": business_phone,
-        "transcript": mock_transcript,
-        "summary": f"[TEST] Call to {business_name} ({business_phone}) completed successfully. Customer interested in website proposal.",
-        "debug_info": debug_info,
-        "timestamp": datetime.now().isoformat()
-    }
-    
-    log_to_file("")
-    log_to_file("🎯 FINAL RESULT SUMMARY:")
-    log_to_file(f"   Status: {result['status']}")
-    log_to_file(f"   Business: {business_name}")
-    log_to_file(f"   Phone: {business_phone}")
-    log_to_file(f"   Transcript Length: {len(mock_transcript)} turns")
-    
-    log_to_file("")
-    log_to_file("=" * 80)
-    log_to_file("✅ PHONE CALL FUNCTION DEBUG COMPLETE")
-    log_to_file("=" * 80)
-    
-    # Log the complete result as JSON for debugging
-    log_to_file("")
-    log_to_file("📋 COMPLETE RESULT JSON:")
-    log_to_file("-" * 40)
-    try:
-        result_json = json.dumps(result, indent=2, ensure_ascii=False)
-        log_to_file(result_json)
-    except Exception as e:
-        log_to_file(f"❌ Failed to serialize result: {e}")
-    
-    log_to_file("")
-    log_to_file("=" * 80)
-    log_to_file("END OF PHONE CALL TOOL USAGE LOG")
-    log_to_file("=" * 80)
+
     
     return result
 
