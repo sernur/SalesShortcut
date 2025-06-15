@@ -126,26 +126,18 @@ def _init_elevenlabs_client():
 
 
 async def _make_real_call(
-    convai,
-    agent_id: str,
-    phone_number_id: str,
     to_number: str,
     system_prompt: str,
-    first_message: str,
     poll_interval: float = 1.0
 ) -> dict[str, Any]:
     """
     Place an actual outbound call via ElevenLabs and return the conversation transcript.
     
     Args:
-        convai: The conversational AI client
-        agent_id: The ID of the ElevenLabs agent
-        phone_number_id: The ID of the phone number to use for the call
         to_number: E.164-formatted destination phone number
         system_prompt: System prompt guiding agent behavior
-        first_message: Agent's opening message
         poll_interval: Seconds between status checks
-        
+
     Returns:
         A dictionary containing call status, transcript, and debug information
     """
@@ -157,9 +149,14 @@ async def _make_real_call(
         "conversation_id": None
     }
     
+    convai, client = _init_elevenlabs_client()
+    
     def add_debug(msg):
         result["debug_info"].append(msg)
         logger.info(msg)
+    agent_id = ELEVENLABS_AGENT_ID
+    phone_number_id = ELEVENLABS_PHONE_NUMBER_ID
+    
     
     add_debug(f"Initiating ElevenLabs call to: {to_number}")
     add_debug(f"Using Agent ID: {agent_id}")
@@ -284,21 +281,39 @@ async def _make_real_call(
         result["error"] = str(e)
         return result
 
-async def phone_call(business_data: dict[str, Any], tool_context: ToolContext) -> dict[str, Any]:
+async def phone_call(business_data: dict[str, Any], proposal: str, tool_context: ToolContext) -> dict[str, Any]:
     """
     Function for calling a Business to discuss website development.
 
     Args:
         business_data (dict[str, Any]): The business data containing phone number and other details.
+        proposal (str): The proposal to present during the call.
         tool_context (ToolContext): The context containing all necessary information for the call.
-    
+
     Returns:
         A dictionary containing test call results
     """
     
-    print("\n" + "="*80)
-    print("🔍 PHONE CALL FUNCTION DEBUG START")
-    print("="*80)
+    # Initialize logging to file
+    root_path = Path.cwd()
+    log_file = root_path / "phone_call_tool_usage.log"
+    
+    def log_to_file(message: str):
+        """Write log message to file with timestamp"""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        with open(log_file, 'a', encoding='utf-8') as f:
+            f.write(f"[{timestamp}] {message}\n")
+    
+    # Clear previous logs and start fresh for this call
+    with open(log_file, 'w', encoding='utf-8') as f:
+        f.write(f"=== PHONE CALL TOOL USAGE LOG - {datetime.now().isoformat()} ===\n\n")
+    
+    log_to_file("=" * 80)
+    log_to_file("🔍 PHONE CALL FUNCTION DEBUG START")
+    log_to_file("=" * 80)
+    
+    log_to_file(f"[proposal] Proposal: {proposal}")
+    
     debug_info = {}
     
     # Extract key information with flexible key handling
@@ -318,38 +333,43 @@ async def phone_call(business_data: dict[str, Any], tool_context: ToolContext) -
         
         debug_info["extracted_phone"] = business_phone
         
-        print(f"\n🎯 EXTRACTED BUSINESS INFORMATION:")
-        print(f"   📝 Name: {business_name}")
-        print(f"   📞 Phone: {business_phone}")
-        print(f"   📧 Email: {business_email}")
-        print(f"   🏙️ City: {business_city}")
-        print(f"   🔍 Keys in business_data: {list(business_data.keys())}")
+        log_to_file("")
+        log_to_file("🎯 EXTRACTED BUSINESS INFORMATION:")
+        log_to_file(f"   📝 Name: {business_name}")
+        log_to_file(f"   📞 Phone: {business_phone}")
+        log_to_file(f"   📧 Email: {business_email}")
+        log_to_file(f"   🏙️ City: {business_city}")
+        log_to_file(f"   🔍 Keys in business_data: {list(business_data.keys())}")
         
         # Check if phone number is usable for calling
         if business_phone and business_phone != 'No phone available':
-            print(f"\n✅ PHONE NUMBER READY FOR CALLING: {business_phone}")
+            log_to_file("")
+            log_to_file(f"✅ PHONE NUMBER READY FOR CALLING: {business_phone}")
         else:
-            print(f"\n❌ NO VALID PHONE NUMBER FOUND")
+            log_to_file("")
+            log_to_file("❌ NO VALID PHONE NUMBER FOUND")
     else:
-        print(f"\n❌ CRITICAL: No business_data found!")
+        log_to_file("")
+        log_to_file("❌ CRITICAL: No business_data found!")
         business_name = 'Unknown Business'
         business_phone = 'No phone available'
         business_email = 'No email available'
     
     # Write comprehensive debug file
-    root_path = Path.cwd()
     debug_file = root_path / "phone_call_debug_detailed.json"
     
     try:
         with open(debug_file, 'w', encoding='utf-8') as f:
             json.dump(debug_info, f, indent=2, ensure_ascii=False)
-        print(f"\n💾 Debug info written to: {debug_file}")
+        log_to_file("")
+        log_to_file(f"💾 Debug info written to: {debug_file}")
     except Exception as e:
-        print(f"❌ Failed to write debug file: {e}")
+        log_to_file(f"❌ Failed to write debug file: {e}")
     
     # Create mock conversation result
-    print(f"\n🎭 CREATING MOCK CONVERSATION RESULT")
-    print("-" * 50)
+    log_to_file("")
+    log_to_file("🎭 CREATING MOCK CONVERSATION RESULT")
+    log_to_file("-" * 50)
     
     # Mock conversation with the extracted data
     mock_transcript = [
@@ -383,13 +403,14 @@ async def phone_call(business_data: dict[str, Any], tool_context: ToolContext) -
         }
     ]
     
-    # Print the mock conversation to console
-    print("\n📞 MOCK CONVERSATION TRANSCRIPT:")
-    print("=" * 60)
+    # Log the mock conversation to file
+    log_to_file("")
+    log_to_file("📞 MOCK CONVERSATION TRANSCRIPT:")
+    log_to_file("=" * 60)
     for i, turn in enumerate(mock_transcript, 1):
         role_icon = "🤖" if turn["role"] == "agent" else "👤"
-        print(f"{i}. {role_icon} {turn['role'].upper()}: {turn['message']}")
-    print("=" * 60)
+        log_to_file(f"{i}. {role_icon} {turn['role'].upper()}: {turn['message']}")
+    log_to_file("=" * 60)
     
     # Create final result
     result = {
@@ -405,18 +426,34 @@ async def phone_call(business_data: dict[str, Any], tool_context: ToolContext) -
         "timestamp": datetime.now().isoformat()
     }
     
-    print(f"\n🎯 FINAL RESULT SUMMARY:")
-    print(f"   Status: {result['status']}")
-    print(f"   Business: {business_name}")
-    print(f"   Phone: {business_phone}")
-    print(f"   Transcript Length: {len(mock_transcript)} turns")
+    log_to_file("")
+    log_to_file("🎯 FINAL RESULT SUMMARY:")
+    log_to_file(f"   Status: {result['status']}")
+    log_to_file(f"   Business: {business_name}")
+    log_to_file(f"   Phone: {business_phone}")
+    log_to_file(f"   Transcript Length: {len(mock_transcript)} turns")
     
-    print("\n" + "="*80)
-    print("✅ PHONE CALL FUNCTION DEBUG COMPLETE")
-    print("="*80 + "\n")
+    log_to_file("")
+    log_to_file("=" * 80)
+    log_to_file("✅ PHONE CALL FUNCTION DEBUG COMPLETE")
+    log_to_file("=" * 80)
+    
+    # Log the complete result as JSON for debugging
+    log_to_file("")
+    log_to_file("📋 COMPLETE RESULT JSON:")
+    log_to_file("-" * 40)
+    try:
+        result_json = json.dumps(result, indent=2, ensure_ascii=False)
+        log_to_file(result_json)
+    except Exception as e:
+        log_to_file(f"❌ Failed to serialize result: {e}")
+    
+    log_to_file("")
+    log_to_file("=" * 80)
+    log_to_file("END OF PHONE CALL TOOL USAGE LOG")
+    log_to_file("=" * 80)
     
     return result
-
 
 # High level tool definition for phone call
 phone_call_tool = FunctionTool(func=phone_call)
