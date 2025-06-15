@@ -4,7 +4,6 @@ Main agent definition for the SDR Agent.
 
 from google.adk.agents.sequential_agent import SequentialAgent
 from .config import MODEL
-from .prompts import ROOT_AGENT_PROMPT
 from .sub_agents.research_lead_agent import research_lead_agent
 from .sub_agents.proposal_generator_agent import proposal_generator_agent
 from .sub_agents.outreach_caller_agent import outreach_caller_agent
