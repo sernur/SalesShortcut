@@ -1,0 +1,24 @@
+{
+  "timestamp": "2025-06-15T10:37:56.258729",
+  "data": {
+    "timestamp": "2025-06-15T10:37:56.256257",
+    "business_data": {
+      "created_at": "2025-06-15T10:37:13.223516",
+      "email": null,
+      "city": "Logan",
+      "notes": [
+        "AgentType.LEAD_FINDER: Successfully discovered business: The Sportsman in Logan"
+      ],
+      "id": "generated_-5254716622828483295",
+      "description": null,
+      "phone": "435-317-3849",
+      "status": "found",
+      "updated_at": "2025-06-15T10:37:13.223519",
+      "name": "The Sportsman in Logan"
+    },
+    "proposal": "Subject: Proposal for a Powerful Website Redesign for The Sportsman in Logan\n\nDear [Name of Decision-Maker at The Sportsman in Logan, if known, otherwise: Owner/Manager],\n\nWe understand that The Sportsman in Logan has been a trusted provider of quality sporting goods and services in Cache Valley since 1947. Your commitment to excellent customer service, high-quality products, and expert advice has built a strong reputation. We recognize the value of your long-standing history and family-owned business.\n\nOur research indicates that while you have a website ([https://www.thesportsmanltd.com/](https://www.thesportsmanltd.com/)), there's a significant opportunity to enhance your online presence to better serve your loyal customers and reach new ones.\n\n**Here's what we've found, and how we can help:**\n\n**Current Situation:**\n\n*   **Strong Local Reputation:** The Sportsman is known for outstanding customer service, knowledgeable staff, and a great selection of sporting goods, including clothing, shoes, skis, bikes, and camping supplies. You also offer unique products, rentals, and services like ski and snowboard tuning.\n*   **Online Presence Gap:** Your current website could be significantly improved to enhance your brand and reach more customers. It appears you are on Shopify.\n*   **Competition:** You face competition from larger retailers and online stores. Customers are looking for an easy way to buy online, and access to information 24/7.\n\n**How a New Website Can Help:**\n\nWe propose a redesigned website to address these challenges and unlock new opportunities:\n\n*   **Increase Visibility:** We'll implement SEO best practices to improve your search engine ranking, attracting more local customers searching for sporting goods and services.\n*   **Enhance Customer Experience:** Your customers can easily browse products, access rental information, and learn about your services 24/7, leading to greater satisfaction.\n*   **Drive Online Sales:** An e-commerce platform will allow you to sell your products online, expanding your reach and revenue potential, solving your customer's desire to buy products easily.\n*   **Showcase Expertise:** Highlight your staff's expertise and knowledge, especially your ski and snowboard tuning services, fostering customer trust and loyalty.\n*   **Build Brand Loyalty:** Share your story, history, and values to connect with your customers on a deeper level.\n\n**Our Services and Solutions:**\n\nWe offer comprehensive website development services, including:\n\n*   **Modern, User-Friendly Design:** A website tailored to your brand, showcasing your products and services in an engaging way.\n*   **E-commerce Functionality:** Enabling online sales and easy management of your product catalog.\n*   **SEO Optimization:** Ensuring your website ranks high in search results, driving organic traffic.\n*   **Mobile Responsiveness:** Ensuring your website looks and functions flawlessly on all devices.\n*   **Ongoing Support and Maintenance:** Providing continuous support to keep your website up-to-date.\n\n**Benefits You Can Expect:**\n\n*   **Increased Revenue:** Through online sales and increased store traffic.\n*   **Improved Customer Engagement:** With a user-friendly website and online communication tools.\n*   **Enhanced Brand Image:** Reflecting your company's quality and expertise.\n*   **Competitive Advantage:** Differentiating yourself from competitors with a professional online presence.\n*   **Address customer pain points:** Provide customers with the ability to buy products online, anytime.\n\n**Next Steps:**\n\nWe are confident that a new website will be a valuable investment for The Sportsman. We'd like to offer you a free website audit to see how you can improve your online visibility. We'd love to schedule a brief call to discuss your specific needs, goals, and how we can help you achieve them. Are you available for a call on [Suggest a specific date and time, e.g., Thursday at 2:00 PM]?  We can then discuss:\n*   Your specific product catalog.\n*   Your rental and service offerings in detail.\n*   Your target audience and brand.\n\nSincerely,\n[Your Name/Company Name]\n[Your Contact Information]",
+    "call_category": {
+      "result": "call_category: agreed_to_email"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "business_data": {
+    "updated_at": "2025-06-15T10:37:13.223519",
+    "phone": "435-317-3849",
+    "notes": [
+      "AgentType.LEAD_FINDER: Successfully discovered business: The Sportsman in Logan"
+    ],
+    "status": "found",
+    "email": null,
+    "name": "The Sportsman in Logan",
+    "city": "Logan",
+    "created_at": "2025-06-15T10:37:13.223516",
+    "description": null,
+    "id": "generated_-5254716622828483295"
+  },
+  "extracted_phone": "435-317-3849"
+}

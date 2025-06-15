@@ -10,6 +10,7 @@ load_dotenv()
 
 # Model configuration
 MODEL = os.getenv("MODEL", "gemini-2.0-flash-lite")
+MODEL_THINK = os.getenv("MODEL_THINK", "gemini-2.5-flash-preview-05-20")
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.2"))
 TOP_P = float(os.getenv("TOP_P", "0.95"))
 TOP_K = int(os.getenv("TOP_K", "40"))
