@@ -13,6 +13,7 @@ from elevenlabs import ElevenLabs
 
 from google.adk.tools import FunctionTool, ToolContext
 from ..config import ELEVENLABS_API_KEY, ELEVENLABS_AGENT_ID, ELEVENLABS_PHONE_NUMBER_ID
+from ..prompts import CALLER_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,7 @@ def _init_elevenlabs_client():
         return None, None
 
 
-async def _make_test_call(
+async def _make_call(
     to_number: str,
     system_prompt: str,
     first_message: str,
@@ -214,9 +215,7 @@ async def phone_call(business_data: dict[str, Any], proposal: str, tool_context:
     log_to_file("=" * 80)
     log_to_file("🔍 PHONE CALL FUNCTION DEBUG START")
     log_to_file("=" * 80)
-    
-    log_to_file(f"[proposal] Proposal: {proposal}")
-    
+        
     debug_info = {}
         
     # Check environment variables
@@ -234,16 +233,9 @@ async def phone_call(business_data: dict[str, Any], proposal: str, tool_context:
     if missing_vars:
         log_to_file(f"\n❌ Missing environment variables: {', '.join(missing_vars)}")
         log_to_file("Please set these environment variables before running the test.")
-        return
+        return "No valid environment variables found for ElevenLabs API. Please set ELEVENLABS_API_KEY, ELEVENLABS_AGENT_ID, and ELEVENLABS_PHONE_NUMBER_ID."
     
-    # Confirm before making the call
-    log_to_file(f"\n⚠️  ABOUT TO MAKE A REAL PHONE CALL!")
-    log_to_file(f"   📞 Calling: {normalized_number}")
-    log_to_file(f"   🤖 Agent will say: \"{FIRST_MESSAGE[:60]}...\"")
-    log_to_file(f"\n💰 Note: This will use ElevenLabs credits and may incur charges.")
-
     # Make the call
-    log_to_file(f"\n🚀 Initiating call to {normalized_number}...")
     log_to_file("⏳ This may take a few minutes depending on call duration...")
     
     
@@ -251,7 +243,6 @@ async def phone_call(business_data: dict[str, Any], proposal: str, tool_context:
     if business_data and proposal:
         debug_info["business_data"] = business_data
         debug_info["proposal"] = proposal
-        business_name = business_data.get('name', 'Unknown Business')
         
         # Handle both 'phone' and 'phone_number' keys
         business_phone = (
@@ -259,10 +250,7 @@ async def phone_call(business_data: dict[str, Any], proposal: str, tool_context:
             business_data.get('phone_number') or 
             'No phone available'
         )
-        
-        business_email = business_data.get('email', 'No email available')
-        business_city = business_data.get('city', 'Unknown City')
-        
+    
         debug_info["extracted_phone"] = business_phone
         
         log_to_file(f"\n🔍 Validating phone number: {business_phone}")
@@ -271,9 +259,10 @@ async def phone_call(business_data: dict[str, Any], proposal: str, tool_context:
         if not validation["valid"]:
             log_to_file(f"❌ Phone number validation failed: {validation['error']}")
             log_to_file("\n💡 Please edit business_phone in this script with a valid US phone number")
-            return
+            return "Try another phone number or format"
 
         normalized_number = validation["normalized"]
+        log_to_file(f"\n🚀 Initiating call to {normalized_number}...")
         log_to_file(f"✅ Phone number valid. Normalized: {normalized_number}")
 
         FIRST_MESSAGE = "Hello!.. This is Lexi from Web Solutions Inc. I hope I'm not catching you at a bad time. I'm calling to let you know about our website development services for you. Do you have just a quick moment to chat?"
@@ -285,7 +274,7 @@ async def phone_call(business_data: dict[str, Any], proposal: str, tool_context:
 
 
         start_time = time.time()
-        result = await make_test_call(
+        result = await _make_call(
                to_number=normalized_number,
                system_prompt=SYSTEM_PROMPT,
                first_message=FIRST_MESSAGE,
@@ -293,27 +282,10 @@ async def phone_call(business_data: dict[str, Any], proposal: str, tool_context:
         )
         end_time = time.time()
         
-        log_to_file("")
-        log_to_file("🎯 EXTRACTED BUSINESS INFORMATION:")
-        log_to_file(f"   📝 Name: {business_name}")
-        log_to_file(f"   📞 Phone: {business_phone}")
-        log_to_file(f"   📧 Email: {business_email}")
-        log_to_file(f"   🏙️ City: {business_city}")
-        log_to_file(f"   🔍 Keys in business_data: {list(business_data.keys())}")
+        log_to_file(" - - - - - ")
+        log_to_file(f"📞 Call completed in {end_time - start_time:.2f} seconds")
+        log_to_file(f"📜 Transcript: {json.dumps(result, indent=2, ensure_ascii=False)}")
         
-        # Check if phone number is usable for calling
-        if business_phone and business_phone != 'No phone available':
-            log_to_file("")
-            log_to_file(f"✅ PHONE NUMBER READY FOR CALLING: {business_phone}")
-        else:
-            log_to_file("")
-            log_to_file("❌ NO VALID PHONE NUMBER FOUND")
-    else:
-        log_to_file("")
-        log_to_file("❌ CRITICAL: No business_data found!")
-        business_name = 'Unknown Business'
-        business_phone = 'No phone available'
-        business_email = 'No email available'
     
     # Write comprehensive debug file
     debug_file = root_path / "phone_call_debug_detailed.json"
