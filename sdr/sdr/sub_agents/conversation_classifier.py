@@ -18,5 +18,7 @@ conversation_classifier_agent = LlmAgent(
     model=MODEL_THINK,
     instruction=CONVERSATION_CLASSIFIER_PROMPT,
     output_schema=ConversationClassificationResult,
-    output_key="call_category"
+    output_key="call_category",
+    disallow_transfer_to_parent=True,
+    disallow_transfer_to_peers=True
 )

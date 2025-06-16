@@ -8,7 +8,6 @@ from typing_extensions import override
 
 from google.adk.agents import BaseAgent
 from google.adk.agents.invocation_context import InvocationContext
-from google.adk.agents.llm_agent import LlmAgent
 from google.adk.events import Event
 from google.genai import types
 
@@ -21,13 +20,13 @@ class SDRRouter(BaseAgent):
     based on a boolean flag in the session state ('call_category').
     """
 
-    email_agent: LlmAgent
-    save_to_database_agent: LlmAgent
+    email_agent: BaseAgent
+    save_to_database_agent: BaseAgent
 
     model_config = {"arbitrary_types_allowed": True}
 
     def __init__(
-        self, name: str, email_agent: LlmAgent, save_to_database_agent: LlmAgent
+        self, name: str, email_agent: BaseAgent, save_to_database_agent: BaseAgent
     ):
         """
         Initializes the SDRRouter.
