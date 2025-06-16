@@ -97,6 +97,27 @@ def main(host: str, port: int):
                     ],
                     tags=['engagement', 'lead'],
                 ),
+                AgentSkill(
+                    id='conversation_classifier',
+                    name='Conversation Classifier',
+                    description='Classify the conversation to determine the next steps.',
+                    examples=[
+                        "Classify the conversation with 'Acme Corp' to determine if they are interested",
+                        "Analyze the conversation with 'Joe\'s Diner' to see if they want to proceed",
+                    ],
+                    tags=['classification', 'conversation'],
+                ),
+                AgentSkill(
+                    id='sdr_router',
+                    name='SDR Router',
+                    description='Route the lead to the appropriate agent based on the conversation classification.',
+                    examples=[
+                        "Route the lead from 'Acme Corp' to the appropriate agent",
+                        "Direct the lead from 'Joe\'s Diner' to the right team",
+                    ],
+                    tags=['routing', 'lead'],
+                )
+                
             ]
         )
     except AttributeError as e:
