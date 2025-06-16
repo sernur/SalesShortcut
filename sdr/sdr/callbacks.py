@@ -222,3 +222,63 @@ async def phone_number_validation_callback(
     # Return None to indicate that the tool execution should proceed with the (potentially modified) args.
     return None
 
+
+async def prevent_duplicate_call_callback(
+    tool: BaseTool, args: dict[str, Any], tool_context: ToolContext
+) -> Optional[dict]:
+    """
+    Before-tool callback to prevent duplicate phone calls by checking if call_result already exists.
+    """
+    
+    tool_name = tool.name
+    
+    # Only apply this callback to the phone call tool
+    if tool_name not in ["phone_call_tool", "phone_call_tool_test"]:
+        return None
+    
+    # Check if call_result already exists in the state
+    if hasattr(tool_context, 'state') and tool_context.state:
+        state_dict = tool_context.state.to_dict() if hasattr(tool_context.state, 'to_dict') else tool_context.state
+        
+        # Check for existing call_result
+        if 'call_result' in state_dict:
+            call_result = state_dict['call_result']
+            
+            # Check if the call was already completed successfully
+            if isinstance(call_result, dict):
+                call_status = call_result.get('status')
+                
+                # If status is 'done' or 'completed', return the existing result
+                if call_status in ['done', 'completed']:
+                    logger.info(f"Call already completed with status '{call_status}'. Returning cached result.")
+                    return {"result": call_result}
+                
+                # Also check if we have a valid transcript indicating completion
+                transcript = call_result.get('transcript', [])
+                if transcript and len(transcript) > 0:
+                    logger.info("Call already completed with transcript. Returning cached result.")
+                    return {"result": call_result}
+    
+    # If we have session state, also check there
+    if hasattr(tool_context, 'session') and tool_context.session:
+        session_state = tool_context.session.state if hasattr(tool_context.session, 'state') else {}
+        
+        if 'call_result' in session_state:
+            call_result = session_state['call_result']
+            
+            if isinstance(call_result, dict):
+                call_status = call_result.get('status')
+                
+                if call_status in ['done', 'completed']:
+                    logger.info(f"Call already completed in session with status '{call_status}'. Returning cached result.")
+                    return {"result": call_result}
+                
+                transcript = call_result.get('transcript', [])
+                if transcript and len(transcript) > 0:
+                    logger.info("Call already completed in session with transcript. Returning cached result.")
+                    return {"result": call_result}
+    
+    # No previous successful call found, proceed with the tool execution
+    logger.info("No previous successful call found. Proceeding with phone call.")
+    return None
+
