@@ -3,8 +3,8 @@ Requirements Refiner Agent for analyzing and refining commercial requirements.
 """
 
 from google.adk.agents.llm_agent import LlmAgent
-from ...config import MODEL_THINK
-from ...prompts import REQUIREMENTS_REFINER_PROMPT
+from .....config import MODEL_THINK
+from .....prompts import REQUIREMENTS_REFINER_PROMPT
 
 requirements_refiner_agent = LlmAgent(
     name="RequirementsRefinerAgent",

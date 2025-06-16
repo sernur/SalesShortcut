@@ -3,8 +3,8 @@ Engagement Saver Agent for saving email engagement data to BigQuery.
 """
 
 from google.adk.agents.llm_agent import LlmAgent
-from ...config import MODEL
-from ...prompts import ENGAGEMENT_SAVER_PROMPT
+from ....config import MODEL
+from ....prompts import ENGAGEMENT_SAVER_PROMPT
 
 engagement_saver_agent = LlmAgent(
     name="EngagementSaverAgent",

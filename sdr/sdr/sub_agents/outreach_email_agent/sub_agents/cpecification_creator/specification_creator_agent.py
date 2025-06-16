@@ -13,7 +13,7 @@ from google.adk.events import Event
 from google.genai import types
 
 from .requirements_refiner_agent import requirements_refiner_agent
-from .quality_checker_agent import quality_checker_agent
+from ..quality_checker_agent import quality_checker_agent
 from .spec_creator_agent import spec_creator_agent
 
 logger = logging.getLogger(__name__)

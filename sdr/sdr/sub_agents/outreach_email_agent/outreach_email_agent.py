@@ -3,10 +3,10 @@ Outreach Email Agent - Sequential agent for creating commercial offers and sendi
 """
 
 from google.adk.agents.sequential_agent import SequentialAgent
-from .specification_creator_agent import specification_creator_agent
-from .websiter_creator_agent import websiter_creator_agent
-from .email_agent import email_agent
-from .engagement_saver_agent import engagement_saver_agent
+from .sub_agents.cpecification_creator.specification_creator_agent import specification_creator_agent
+from .sub_agents.websiter_creator_agent import websiter_creator_agent
+from .sub_agents.email_agent import email_agent
+from .sub_agents.engagement_saver_agent import engagement_saver_agent
 
 outreach_email_agent = SequentialAgent(
     name="OutreachEmailAgent",
