@@ -483,8 +483,8 @@ async def call_sdr_agent_simple(business_data: dict[str, Any], session_id: str) 
         async with httpx.AsyncClient(timeout=300.0) as client:
             # Try different endpoints that might exist
             endpoints_to_try = [
-                f"{sdr_url}/engage_lead",
-                f"{sdr_url}/process",
+                # f"{sdr_url}/engage_lead",
+                # f"{sdr_url}/process",
                 f"{sdr_url}/",
             ]
             
