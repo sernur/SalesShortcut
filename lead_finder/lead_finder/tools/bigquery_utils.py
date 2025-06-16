@@ -27,18 +27,39 @@ class BigQueryClient:
             logger.warning("Google Cloud Project not configured. BigQuery operations will be mocked.")
             return
         
+        # Check if credentials are available
+        import os
+        credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+        if not credentials_path:
+            logger.warning("GOOGLE_APPLICATION_CREDENTIALS not set. BigQuery operations will be mocked.")
+            return
+        
+        if not os.path.exists(credentials_path):
+            logger.warning(f"Credentials file not found at {credentials_path}. BigQuery operations will be mocked.")
+            return
+        
         try:
             self.client = bigquery.Client(project=PROJECT)
             self.dataset_ref = self.client.dataset(DATASET_ID)
             self.table_ref = self.dataset_ref.table(TABLE_ID)
             logger.info(f"BigQuery client initialized for project: {PROJECT}")
             
-            # Ensure dataset and table exist
-            self._ensure_dataset_exists()
+            # Test the connection by trying to get the dataset
+            try:
+                self.client.get_dataset(self.dataset_ref)
+                logger.info(f"Successfully connected to BigQuery dataset: {DATASET_ID}")
+            except Exception as dataset_error:
+                logger.warning(f"Cannot access BigQuery dataset {DATASET_ID}: {dataset_error}")
+                logger.info("BigQuery operations will use mock fallback")
+                self.client = None
+                return
+            
+            # Ensure table exists
             self._ensure_table_exists()
             
         except Exception as e:
             logger.error(f"Failed to initialize BigQuery client: {e}")
+            logger.info("BigQuery operations will use mock fallback")
             self.client = None
 
     def _ensure_dataset_exists(self):
@@ -134,8 +155,8 @@ class BigQueryClient:
         
         # Add timestamps and default values
         now = datetime.utcnow()
-        cleaned["created_at"] = now
-        cleaned["updated_at"] = now
+        cleaned["created_at"] = now.isoformat() + 'Z'  # BigQuery expects ISO format with Z
+        cleaned["updated_at"] = now.isoformat() + 'Z'
         cleaned["lead_status"] = "NEW"
         cleaned["contact_attempts"] = 0
         cleaned["last_contact_date"] = None
@@ -156,6 +177,7 @@ class BigQueryClient:
             Dictionary with upload results and statistics
         """
         if not self.client:
+            logger.info("BigQuery client not available, using mock upload")
             return await self._mock_upload(businesses, city, search_type)
         
         if not businesses:
@@ -197,8 +219,12 @@ class BigQueryClient:
             if new_rows:
                 # Insert new rows
                 def _insert_rows():
-                    errors = self.client.insert_rows_json(self.table_ref, new_rows)
-                    return errors
+                    try:
+                        errors = self.client.insert_rows_json(self.table_ref, new_rows)
+                        return errors
+                    except Exception as e:
+                        logger.error(f"Error in insert_rows_json: {e}")
+                        raise
                 
                 errors = await asyncio.to_thread(_insert_rows)
                 
@@ -340,12 +366,24 @@ class BigQueryClient:
         timestamp = datetime.now().isoformat().replace(":", "-")
         filename = f"bigquery_mock_{city}_{timestamp}.json"
         
+        # Prepare data for JSON serialization (avoid datetime objects)
+        serializable_businesses = []
+        for business in businesses:
+            # Create a copy and ensure all values are JSON serializable
+            clean_business = {}
+            for key, value in business.items():
+                if isinstance(value, datetime):
+                    clean_business[key] = value.isoformat()
+                else:
+                    clean_business[key] = value
+            serializable_businesses.append(clean_business)
+        
         mock_data = {
             "timestamp": datetime.now().isoformat(),
             "city": city,
             "search_type": search_type,
             "record_count": len(businesses),
-            "data": businesses
+            "data": serializable_businesses
         }
         
         try:
