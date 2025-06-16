@@ -40,7 +40,7 @@ class GoogleMapsClient:
             # Request specific fields for business information
             fields = [
                 'name', 'formatted_address', 'formatted_phone_number',
-                'website', 'rating', 'user_ratings_total', 'types',
+                'website', 'rating', 'user_ratings_total', 'type',
                 'opening_hours', 'price_level', 'geometry'
             ]
             
@@ -109,7 +109,7 @@ class GoogleMapsClient:
                     "website": place_details.get('website', ''),
                     "rating": rating,
                     "total_ratings": place_details.get('user_ratings_total', 0),
-                    "category": self._get_primary_category(place_details.get('types', place.get('types', []))),
+                    "category": self._get_primary_category(place_details.get('type', place.get('types', []))),
                     "price_level": place_details.get('price_level', 0),
                     "is_open": self._get_open_status(place_details.get('opening_hours', {})),
                     "location": {

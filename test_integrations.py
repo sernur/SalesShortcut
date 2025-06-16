@@ -6,19 +6,23 @@ Test script for Google Maps and BigQuery integrations.
 import asyncio
 import os
 import sys
+from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-# Add the lead_finder module to the path
-sys.path.append('lead_finder')
+# Add the project root to Python path
+project_root = Path(__file__).parent
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / 'lead_finder'))
 
 async def test_google_maps_integration():
     """Test the Google Maps API integration."""
     print("🗺️  Testing Google Maps Integration...")
     
     try:
+        # Import the tools directly
         from lead_finder.tools.maps_search import google_maps_search, google_maps_nearby_search
         
         # Test basic search
@@ -40,6 +44,8 @@ async def test_google_maps_integration():
         
     except Exception as e:
         print(f"   ❌ Google Maps test failed: {e}")
+        import traceback
+        print(f"   🔍 Detailed error: {traceback.format_exc()}")
         return False
 
 async def test_bigquery_integration():
@@ -108,6 +114,8 @@ async def test_bigquery_integration():
         
     except Exception as e:
         print(f"   ❌ BigQuery test failed: {e}")
+        import traceback
+        print(f"   🔍 Detailed error: {traceback.format_exc()}")
         return False
 
 async def test_integrated_workflow():
@@ -143,6 +151,8 @@ async def test_integrated_workflow():
         
     except Exception as e:
         print(f"   ❌ Integrated workflow failed: {e}")
+        import traceback
+        print(f"   🔍 Detailed error: {traceback.format_exc()}")
         return False
 
 def check_environment():
@@ -169,10 +179,39 @@ def check_environment():
     
     return all_good
 
+def check_file_structure():
+    """Check if the required files exist."""
+    print("📁 Checking File Structure...")
+    
+    required_files = [
+        'lead_finder/lead_finder/tools/maps_search.py',
+        'lead_finder/lead_finder/tools/bigquery_utils.py',
+        'lead_finder/lead_finder/config.py'
+    ]
+    
+    all_good = True
+    
+    for file_path in required_files:
+        if Path(file_path).exists():
+            print(f"   ✅ {file_path}: Found")
+        else:
+            print(f"   ❌ {file_path}: Missing")
+            all_good = False
+    
+    return all_good
+
 async def main():
     """Run all integration tests."""
     print("🚀 Starting Integration Tests for SalesShortcut")
     print("=" * 50)
+    
+    # Check file structure first
+    file_ok = check_file_structure()
+    print()
+    
+    if not file_ok:
+        print("❌ File structure check failed. Some required files are missing.")
+        return
     
     # Check environment
     env_ok = check_environment()
@@ -199,6 +238,8 @@ async def main():
             results.append((test_name, result))
         except Exception as e:
             print(f"❌ {test_name} crashed: {e}")
+            import traceback
+            print(f"🔍 Detailed error: {traceback.format_exc()}")
             results.append((test_name, False))
         print()
     
@@ -216,8 +257,12 @@ async def main():
     
     if passed == len(results):
         print("🎉 All integrations working successfully!")
+        print("✅ Google Maps: Connected and working")
+        print("✅ BigQuery: Connected and working")
+    elif passed > 0:
+        print("⚠️  Some tests passed, some failed. Check the details above.")
     else:
-        print("⚠️  Some tests failed. Check your API keys and configuration.")
+        print("❌ All tests failed. Check your API keys and configuration.")
 
 if __name__ == "__main__":
     asyncio.run(main()) 
