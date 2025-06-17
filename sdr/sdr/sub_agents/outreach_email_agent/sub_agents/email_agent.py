@@ -6,7 +6,7 @@ import os # Import os to access environment variables
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.tools.google_api_tool import GmailToolset # <-- Import GmailToolset
 
-from ....config import MODEL, GOOGLE_CLOUD_CLIENT_ID, GOOGLE_CLOUD_CLIENT_SECRET
+from sdr.sdr.config import MODEL, GOOGLE_CLOUD_CLIENT_ID, GOOGLE_CLOUD_CLIENT_SECRET
 from ....prompts import EMAIL_AGENT_PROMPT
 
 

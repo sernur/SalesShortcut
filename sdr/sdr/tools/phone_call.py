@@ -278,7 +278,7 @@ async def phone_call(business_data: dict[str, Any], proposal: str, tool_context:
         "Polling status: processing",
         "Polling status: done"
       ],
-      "error": null,
+      "error": None,
       "conversation_id": "conv_01jxv205n2f2s96ycrcx00s1cx"
     }
     
