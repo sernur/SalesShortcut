@@ -37,3 +37,9 @@ TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER", "")
 # Google Cloud Client ID for OAuth
 GOOGLE_CLOUD_CLIENT_ID = os.getenv("GOOGLE_CLOUD_CLIENT_ID", "")
 GOOGLE_CLOUD_CLIENT_SECRET = os.getenv("GOOGLE_CLOUD_CLIENT_SECRET", "")
+
+# Test mode configuration
+TEST_MODE = os.getenv("TEST", "false").lower() == "true"
+
+# UI service configuration
+UI_SERVICE_ENABLED = os.getenv("UI_SERVICE_ENABLED", "true").lower() == "true"

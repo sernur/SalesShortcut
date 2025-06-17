@@ -2,6 +2,7 @@
 
 import logging
 from google.adk.tools import FunctionTool
+from sdr.sdr.config import TEST_MODE
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,14 @@ def edit_proposal_content(current_content: str, edit_instructions: str) -> str:
         str: The edited proposal content
     """
     try:
-        logger.info("Processing content edit request")
+        logger.info(f"Processing content edit request - Instructions: {edit_instructions[:100]}...")
+        logger.debug(f"Current content length: {len(current_content)} characters")
+        
+        if TEST_MODE:
+            logger.info("TEST MODE: Returning mock edited content")
+            mock_content = current_content + f"\n\n<!-- MOCK EDIT: {edit_instructions} -->"
+            logger.info(f"TEST MODE: Mock edit applied, new length: {len(mock_content)} characters")
+            return mock_content
         
         # This function allows the agent to modify the proposal content
         # The agent can provide specific edit instructions and this tool
@@ -28,6 +36,7 @@ def edit_proposal_content(current_content: str, edit_instructions: str) -> str:
         edited_content = current_content
         
         logger.info("Content editing completed successfully")
+        logger.debug(f"Final content length: {len(edited_content)} characters")
         return edited_content
         
     except Exception as e:
@@ -48,6 +57,13 @@ def replace_content_section(current_content: str, section_name: str, new_section
     """
     try:
         logger.info(f"Replacing section: {section_name}")
+        logger.debug(f"New section content length: {len(new_section_content)} characters")
+        
+        if TEST_MODE:
+            logger.info(f"TEST MODE: Returning mock section replacement for '{section_name}'")
+            mock_content = current_content.replace(f"## {section_name}", f"## {section_name} (MOCK REPLACED)")
+            logger.info(f"TEST MODE: Mock section replacement completed")
+            return mock_content
         
         import re
         
@@ -65,6 +81,7 @@ def replace_content_section(current_content: str, section_name: str, new_section
             updated_content += f"\n\n## {section_name}\n{new_section_content}"
             
         logger.info("Section replacement completed successfully")
+        logger.debug(f"Updated content length: {len(updated_content)} characters")
         return updated_content
         
     except Exception as e:
@@ -85,7 +102,14 @@ def add_content_section(current_content: str, section_name: str, section_content
         str: The updated proposal content with the new section
     """
     try:
-        logger.info(f"Adding new section: {section_name}")
+        logger.info(f"Adding new section: {section_name} at position: {position}")
+        logger.debug(f"Section content length: {len(section_content)} characters")
+        
+        if TEST_MODE:
+            logger.info(f"TEST MODE: Returning mock section addition for '{section_name}'")
+            mock_content = current_content + f"\n\n## {section_name} (MOCK ADDED)\n{section_content[:50]}..."
+            logger.info(f"TEST MODE: Mock section addition completed")
+            return mock_content
         
         new_section = f"\n\n## {section_name}\n{section_content}"
         
@@ -108,6 +132,7 @@ def add_content_section(current_content: str, section_name: str, section_content
             updated_content = re.sub(pattern, rf"\1{new_section}", current_content, flags=re.DOTALL | re.IGNORECASE)
             
         logger.info("Section addition completed successfully")
+        logger.debug(f"Updated content length: {len(updated_content)} characters")
         return updated_content
         
     except Exception as e:
