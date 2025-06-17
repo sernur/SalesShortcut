@@ -3,7 +3,7 @@ Websiter Creator Agent for creating demo prototype websites.
 """
 
 from google.adk.agents.llm_agent import LlmAgent
-from ....config import MODEL
+from sdr.sdr.config import MODEL
 from ....prompts import WEBSITER_CREATOR_PROMPT
 
 websiter_creator_agent = LlmAgent(

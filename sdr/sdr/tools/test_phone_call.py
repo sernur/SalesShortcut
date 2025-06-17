@@ -18,7 +18,7 @@ from pathlib import Path
 # Add the parent directory to the path to allow imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config import ELEVENLABS_API_KEY, ELEVENLABS_AGENT_ID, ELEVENLABS_PHONE_NUMBER_ID
+from ..config import ELEVENLABS_API_KEY, ELEVENLABS_AGENT_ID, ELEVENLABS_PHONE_NUMBER_ID
 from prompts import CALLER_PROMPT
 from elevenlabs import ElevenLabs
 
