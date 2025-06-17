@@ -299,6 +299,129 @@ async def send_email(
         "email_result": result,
     })
 
+@app.post("/api/human-input")
+async def receive_human_input_request(request: Request):
+    """
+    Receive human input request from SDR agent.
+    This endpoint is called when the agent needs human intervention.
+    """
+    try:
+        data = await request.json()
+        request_id = data.get("request_id")
+        prompt = data.get("prompt")
+        request_type = data.get("type", "unknown")
+        
+        logger.info(f"Received human input request: {request_id} - {request_type}")
+        logger.info(f"Prompt: {prompt}")
+        
+        # Store the request in memory (in production, use database)
+        # For now, just log and acknowledge
+        
+        return JSONResponse({
+            "status": "received",
+            "request_id": request_id,
+            "message": "Human input request received. Please check the UI for the modal dialog.",
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error processing human input request: {e}")
+        return JSONResponse(
+            {"error": f"Failed to process request: {str(e)}"},
+            status_code=500
+        )
+
+@app.get("/api/pending-requests")
+async def get_pending_requests():
+    """Get all pending human input requests for UI display."""
+    try:
+        # Import here to avoid circular imports
+        from sdr.sdr.sub_agents.outreach_email_agent.sub_agents.website_creator.tools.human_creation_tool import get_pending_requests
+        
+        pending = get_pending_requests()
+        return JSONResponse({
+            "status": "success",
+            "requests": pending,
+            "count": len(pending),
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching pending requests: {e}")
+        return JSONResponse(
+            {"error": f"Failed to fetch requests: {str(e)}"},
+            status_code=500
+        )
+
+@app.post("/api/submit-response")
+async def submit_human_response(request: Request):
+    """
+    Submit human response (URL) for a specific request.
+    This endpoint is called when human provides the website URL.
+    """
+    try:
+        data = await request.json()
+        request_id = data.get("request_id")
+        url = data.get("url")
+        action = data.get("action", "submit")  # submit or cancel
+        
+        if not request_id:
+            return JSONResponse(
+                {"error": "request_id is required"},
+                status_code=400
+            )
+        
+        # Import here to avoid circular imports
+        from sdr.sdr.sub_agents.outreach_email_agent.sub_agents.website_creator.tools.human_creation_tool import submit_human_response, cancel_human_request
+        
+        if action == "cancel":
+            success = cancel_human_request(request_id)
+            message = "Request cancelled" if success else "Failed to cancel request"
+        else:
+            if not url:
+                return JSONResponse(
+                    {"error": "url is required for submit action"},
+                    status_code=400
+                )
+            success = submit_human_response(request_id, url)
+            message = f"Response submitted: {url}" if success else "Failed to submit response"
+        
+        logger.info(f"Human response processed: {request_id} - {action} - {message}")
+        
+        return JSONResponse({
+            "status": "success" if success else "error",
+            "message": message,
+            "request_id": request_id,
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error submitting human response: {e}")
+        return JSONResponse(
+            {"error": f"Failed to submit response: {str(e)}"},
+            status_code=500
+        )
+
+@app.get("/human-input")
+async def human_input_page(request: Request):
+    """Render human input page for website creation requests."""
+    try:
+        # Import here to avoid circular imports
+        from sdr.sdr.sub_agents.outreach_email_agent.sub_agents.website_creator.tools.human_creation_tool import get_pending_requests
+        
+        pending = get_pending_requests()
+        return templates.TemplateResponse("human_input.html", {
+            "request": request,
+            "pending_requests": pending
+        })
+        
+    except Exception as e:
+        logger.error(f"Error rendering human input page: {e}")
+        return templates.TemplateResponse("error.html", {
+            "request": request,
+            "error": f"Failed to load human input page: {str(e)}"
+        })
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""

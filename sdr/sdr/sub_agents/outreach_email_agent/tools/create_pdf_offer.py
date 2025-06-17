@@ -410,7 +410,7 @@ def create_sales_proposal_pdf(markdown_offer: str) -> str:
     Raises:
         Exception: If an error occurs during PDF generation.
     """
-    logger.info("Starting PDF generation process.")
+    logger.info("Starting PDF generation process with `create_sales_proposal_pdf` function.")
     current_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
     output_pdf_file = os.path.join(current_dir, "SalesShortcut_Proposal.pdf")
 
