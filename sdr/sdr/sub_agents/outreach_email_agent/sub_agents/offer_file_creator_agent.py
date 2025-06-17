@@ -2,7 +2,12 @@
 from google.adk.agents.llm_agent import LlmAgent
 from sdr.sdr.config import MODEL
 from ..outreach_email_prompt import OFFER_FILE_CREATOR_PROMPT
-from ..tools.offer_file_tools import create_offer_file
+from ..tools.offer_file_tools import (
+    create_offer_file,
+    edit_proposal_content_tool,
+    replace_content_section_tool,
+    add_content_section_tool
+)
 
 
 offer_file_creator_agent = LlmAgent(
@@ -10,6 +15,11 @@ offer_file_creator_agent = LlmAgent(
     description="Agent that creates a commercial offer file based on refined requirements and quality checks",
     model=MODEL,
     instruction=OFFER_FILE_CREATOR_PROMPT,
-    tools=[create_offer_file],
+    tools=[
+        create_offer_file,
+        edit_proposal_content_tool,
+        replace_content_section_tool,
+        add_content_section_tool
+    ],
     output_key="offer_file_path"
 )
