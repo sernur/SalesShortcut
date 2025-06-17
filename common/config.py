@@ -15,6 +15,9 @@ DEFAULT_SDR_PORT: int = 8084
 # --- UI Client Configuration ---
 DEFAULT_UI_CLIENT_PORT: int = 8000
 
+# --- Human Input Service Configuration ---
+DEFAULT_HUMAN_INPUT_PORT: int = 8000
+
 # --- Agent URL Configurations ---
 DEFAULT_CALENDAR_ASSISTANT_URL: str = f"http://127.0.0.1:{DEFAULT_CALENDAR_ASSISTANT_PORT}"
 DEFAULT_LEAD_FINDER_URL: str = f"http://127.0.0.1:{DEFAULT_LEAD_FINDER_PORT}"
@@ -24,6 +27,9 @@ DEFAULT_SDR_URL: str = f"http://127.0.0.1:{DEFAULT_SDR_PORT}"
 
 # --- UI Client URL Configuration ---
 DEFAULT_UI_CLIENT_URL: str = f"http://127.0.0.1:{DEFAULT_UI_CLIENT_PORT}"
+
+# --- Human Input Service URL Configuration ---
+DEFAULT_HUMAN_INPUT_URL: str = f"http://127.0.0.1:{DEFAULT_HUMAN_INPUT_PORT}"
 
 # --- Agent Default Parameters ---
 # Calendar Assistant

@@ -12,6 +12,7 @@ import httpx
 from google.adk.tools import FunctionTool, ToolContext
 
 from common.config import DEFAULT_UI_CLIENT_URL
+from sdr.sdr.config import TEST_MODE
 
 logger = logging.getLogger(__name__)
 
@@ -63,32 +64,44 @@ class HumanInteractionManager:
         if request_id in self._pending_requests:
             del self._pending_requests[request_id]
 
-async def send_ui_notification(request_id: str, prompt: str, ui_endpoint: str = None) -> bool:
-    """Send notification to UI via REST API"""
+async def send_ui_notification(request_id: str, prompt: str, ui_endpoint: str = None, max_retries: int = 3) -> bool:
+    """Send notification to UI via REST API with retry logic"""
     if ui_endpoint is None:
         ui_endpoint = DEFAULT_UI_CLIENT_URL
         
-    try:
-        payload = {
-            "request_id": request_id,
-            "prompt": prompt,
-            "type": "website_creation",
-            "timestamp": datetime.now().isoformat()
-        }
-        
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.post(
-                f"{ui_endpoint}/api/human-input",
-                json=payload,
-                headers={"Content-Type": "application/json"}
-            )
-            response.raise_for_status()
-            logger.info(f"Successfully sent UI notification for request {request_id} to {ui_endpoint}")
-            return True
+    for attempt in range(max_retries):
+        try:
+            payload = {
+                "request_id": request_id,
+                "prompt": prompt,
+                "type": "website_creation",
+                "timestamp": datetime.now().isoformat()
+            }
             
-    except Exception as e:
-        logger.error(f"Failed to send UI notification to {ui_endpoint}: {e}")
-        return False
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(
+                    f"{ui_endpoint}/api/human-input",
+                    json=payload,
+                    headers={"Content-Type": "application/json"}
+                )
+                response.raise_for_status()
+                logger.info(f"Successfully sent UI notification for request {request_id} to {ui_endpoint}")
+                return True
+                
+        except httpx.ConnectError:
+            logger.warning(f"UI service connection failed (attempt {attempt + 1}/{max_retries})")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2 ** attempt)
+        except httpx.TimeoutException:
+            logger.warning(f"UI service timeout (attempt {attempt + 1}/{max_retries})")
+            if attempt < max_retries - 1:
+                await asyncio.sleep(1)
+        except Exception as e:
+            logger.error(f"Failed to send UI notification to {ui_endpoint}: {e}")
+            break
+            
+    logger.error(f"Failed to send UI notification after {max_retries} attempts")
+    return False
 
 async def wait_for_human_response(request_id: str, timeout: int = 300) -> Optional[str]:
     """Wait for human response with timeout (5 minutes default)"""
@@ -137,7 +150,14 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
         str: URL for the created website or error message.
     """
     logger.info("🤖 AGENT: Requesting human website creation")
-    logger.info(f"📋 Prompt: {website_creation_prompt}")
+    logger.info(f"📋 Prompt: {website_creation_prompt[:100]}...")
+    logger.debug(f"Full prompt: {website_creation_prompt}")
+    
+    # if TEST_MODE:
+    #     logger.info("TEST MODE: Returning mock website URL")
+    #     mock_url = f"https://mock-website-{uuid.uuid4().hex[:8]}.example.com"
+    #     logger.info(f"TEST MODE: Mock website created at {mock_url}")
+    #     return mock_url
     
     manager = HumanInteractionManager()
     
@@ -152,13 +172,17 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
         ui_sent = await send_ui_notification(request_id, website_creation_prompt)
         
         if not ui_sent:
-            logger.error("Failed to send notification to UI")
-            manager.cleanup_request(request_id)
-            return "Error: Failed to notify UI. Please ensure the UI service is running."
+            logger.warning("UI service unavailable, falling back to console-based interaction")
+            logger.info("👤 HUMAN INPUT REQUIRED:")
+            logger.info(f"Request ID: {request_id}")
+            logger.info(f"Task: Create a website based on the following prompt:")
+            logger.info(f"Prompt: {website_creation_prompt}")
+            logger.info("Please create the website and provide the URL when ready.")
+            logger.info("You can submit the response using the API or wait for timeout.")
         
         # Wait for human response
         logger.info("⏳ Waiting for human to create website and provide URL...")
-        url_response = await wait_for_human_response(request_id)
+        url_response = await wait_for_human_response(request_id, timeout=600)
         
         if url_response:
             logger.info(f"✅ WEBSITE CREATED: {url_response}")
@@ -175,7 +199,7 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
             
             # Cleanup
             manager.cleanup_request(request_id)
-            return "Error: Human response not received within timeout period."
+            return f"Human input timeout. Request ID: {request_id}. You can still submit a response via API."
             
     except Exception as e:
         logger.error(f"Error during human interaction: {e}")
