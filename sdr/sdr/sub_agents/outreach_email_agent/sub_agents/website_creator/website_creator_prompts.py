@@ -3,10 +3,10 @@ PROMPT_PREPARE_PROMPT = """
 You are an AI agent that prepares a LLM prompt for AI website creation.
 
 ### MARKDOWN TEMPLATE
-{markdown_template}
+{refined_requirements}
 
 ### INSTRUCTION
-1. Read the website requirements and preferences from the state['markdown_template'] key.
+1. Read the website requirements and preferences from the state['refined_requirements'] key.
 2. Generate a detailed prompt that includes:
    - The website map
    - Color and marketing preferences
