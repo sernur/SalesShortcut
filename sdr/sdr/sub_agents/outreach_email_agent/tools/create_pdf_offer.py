@@ -1,480 +1,444 @@
+
+
 import markdown
-from jinja2 import Environment, FileSystemLoader
-from weasyprint import HTML, CSS
 import os
 import asyncio
+import re
 import logging
-from google.adk.tools import FunctionTool, ToolContext
+from datetime import datetime
+from html import unescape
+from urllib.parse import urlparse
 
+from google.adk.tools import FunctionTool
+
+# ReportLab imports
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.colors import HexColor, white, black
+from reportlab.lib.units import inch, cm
+from reportlab.platypus import (
+    SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
+    PageBreak, KeepTogether, Image as RLImage, PageTemplate, Frame
+)
+from reportlab.platypus.tableofcontents import TableOfContents
+from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT, TA_JUSTIFY
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from bs4 import BeautifulSoup
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-async def _create_offer_file(refined_requirements: str) -> str:
-    """Create a PDF commercial offer file based on `refined_requirements` Markdown.
-    Applies the SalesShortcut UI theme using a page-template for background and header.
+class SalesShortcutTemplate:
+    """Custom page template for SalesShortcut branding.
+
+    This class defines the visual layout for each page of the PDF, including a
+    gradient background, a white content card, and a branded header/footer.
+    """
+
+    def __init__(self, doc):
+        """Initializes the SalesShortcutTemplate.
+
+        Args:
+            doc: The ReportLab SimpleDocTemplate instance.
+        """
+        self.doc = doc
+        self.page_count = 0
+
+    def __call__(self, canvas, doc):
+        """Draws the page template elements on each page.
+
+        This method is called by ReportLab for every page generated. It handles
+        drawing the background, content card, and appropriate header/footer.
+
+        Args:
+            canvas: The ReportLab canvas object for drawing.
+            doc: The ReportLab SimpleDocTemplate instance.
+        """
+        self.page_count += 1
+        canvas.saveState()
+
+        width, height = A4
+        self._draw_gradient_background(canvas, width, height)
+        self._draw_content_card(canvas, width, height)
+
+        if self.page_count == 1:
+            self._draw_header(canvas, width, height)
+
+        self._draw_footer(canvas, width, height)
+        canvas.restoreState()
+
+    def _draw_gradient_background(self, canvas, width, height):
+        """Draws a simulated gradient background.
+
+        Args:
+            canvas: The ReportLab canvas object.
+            width (float): The width of the page.
+            height (float): The height of the page.
+        """
+        steps = 50
+        for i in range(steps):
+            ratio = i / steps
+            r = int(0x66 + (0x76 - 0x66) * ratio)
+            g = int(0x7e + (0x4b - 0x7e) * ratio)
+            b = int(0xea + (0xa2 - 0xea) * ratio)
+
+            color = colors.Color(r/255.0, g/255.0, b/255.0)
+            canvas.setFillColor(color)
+
+            rect_height = height / steps
+            canvas.rect(0, height - (i + 1) * rect_height, width, rect_height, fill=1, stroke=0)
+
+    def _draw_content_card(self, canvas, width, height):
+        """Draws the white content card background with a shadow.
+
+        Args:
+            canvas: The ReportLab canvas object.
+            width (float): The width of the page.
+            height (float): The height of the page.
+        """
+        card_margin_x = 2*cm
+        card_margin_y = 1.5*cm
+        card_width = width - 2*card_margin_x
+        card_height = height - card_margin_y - 4.5*cm
+        card_x = card_margin_x
+        card_y = card_margin_y
+
+        canvas.setFillColor(white)
+        canvas.setStrokeColor(colors.Color(0.9, 0.9, 0.9))
+        canvas.setLineWidth(1)
+
+        canvas.roundRect(card_x, card_y, card_width, card_height, 8, fill=1, stroke=1)
+
+        shadow_offset = 3
+        canvas.setFillColor(colors.Color(0, 0, 0, 0.1))
+        canvas.roundRect(card_x + shadow_offset, card_y - shadow_offset, card_width, card_height, 8, fill=1, stroke=0)
+
+        canvas.setFillColor(white)
+        canvas.roundRect(card_x, card_y, card_width, card_height, 8, fill=1, stroke=1)
+
+    def _draw_header(self, canvas, width, height):
+        """Draws the SalesShortcut header on the first page.
+
+        Args:
+            canvas: The ReportLab canvas object.
+            width (float): The width of the page.
+            height (float): The height of the page.
+        """
+        canvas.setFont("Helvetica-Bold", 32)
+        canvas.setFillColor(white)
+
+        logo_y = height - 1.5*cm
+        canvas.drawCentredString(width/2, logo_y, "🚀 SalesShortcut")
+
+        canvas.setFont("Helvetica", 14)
+        canvas.setFillColor(colors.Color(1, 1, 1, 0.9))
+        canvas.drawCentredString(width/2, logo_y - 0.6*cm, "AI-Powered Lead Generation & Management Proposal")
+        canvas.drawCentredString(width/2, logo_y - 0.9*cm, "Prepared by BrightWeb Studio")
+
+    def _draw_footer(self, canvas, width, height):
+        """Draws the page number footer on all pages.
+
+        Args:
+            canvas: The ReportLab canvas object.
+            width (float): The width of the page.
+            height (float): The height of the page.
+        """
+        canvas.setFont("Helvetica", 9)
+        canvas.setFillColor(colors.Color(0.4, 0.4, 0.4))
+        canvas.drawCentredString(width/2, 0.8*cm, f"Page {self.page_count}")
+
+class MarkdownToPDFConverter:
+    """Converts Markdown content into ReportLab story elements with custom styling.
+
+    This class handles the parsing of Markdown, converting it to HTML, and then
+    transforming the HTML into ReportLab flowables (e.g., Paragraphs, Tables).
+    """
+
+    def __init__(self):
+        """Initializes the MarkdownToPDFConverter with predefined styles."""
+        self.styles = self._create_styles()
+        self.story = []
+
+    def _create_styles(self):
+        """Creates and returns a dictionary of custom ReportLab ParagraphStyles."""
+        styles = getSampleStyleSheet()
+
+        primary_color = HexColor('#2563eb')
+        gray_900 = HexColor('#111827')
+        gray_700 = HexColor('#374151')
+        gray_600 = HexColor('#4b5563')
+        gray_200 = HexColor('#e5e7eb')
+        gray_100 = HexColor('#f3f4f6')
+
+        custom_styles = {
+            'CustomTitle': ParagraphStyle(
+                'CustomTitle', parent=styles['Heading1'], fontSize=22, spaceAfter=16,
+                spaceBefore=8, textColor=primary_color, fontName='Helvetica-Bold',
+                alignment=TA_LEFT, leading=28
+            ),
+            'CustomHeading1': ParagraphStyle(
+                'CustomHeading1', parent=styles['Heading1'], fontSize=16, spaceAfter=12,
+                spaceBefore=24, textColor=primary_color, fontName='Helvetica-Bold',
+                alignment=TA_LEFT, leading=20
+            ),
+            'CustomHeading2': ParagraphStyle(
+                'CustomHeading2', parent=styles['Heading2'], fontSize=14, spaceAfter=10,
+                spaceBefore=20, textColor=primary_color, fontName='Helvetica-Bold',
+                alignment=TA_LEFT, leading=18
+            ),
+            'CustomHeading3': ParagraphStyle(
+                'CustomHeading3', parent=styles['Heading3'], fontSize=12, spaceAfter=8,
+                spaceBefore=16, textColor=gray_900, fontName='Helvetica-Bold',
+                alignment=TA_LEFT, leading=16
+            ),
+            'CustomBody': ParagraphStyle(
+                'CustomBody', parent=styles['Normal'], fontSize=10, spaceAfter=10,
+                spaceBefore=2, textColor=gray_700, fontName='Helvetica',
+                alignment=TA_LEFT, leading=16
+            ),
+            'CustomBlockquote': ParagraphStyle(
+                'CustomBlockquote', parent=styles['Normal'], fontSize=10, spaceAfter=16,
+                spaceBefore=16, textColor=gray_700, fontName='Helvetica', alignment=TA_LEFT,
+                leftIndent=24, rightIndent=24, borderColor=primary_color, borderWidth=1,
+                borderPadding=12, backColor=HexColor('#f9fafb'), leading=16
+            ),
+            'CustomCode': ParagraphStyle(
+                'CustomCode', parent=styles['Code'], fontSize=9, spaceAfter=12,
+                spaceBefore=12, textColor=gray_700, fontName='Courier', backColor=gray_100,
+                borderColor=gray_200, borderWidth=1, borderPadding=10, leftIndent=12,
+                rightIndent=12, leading=12
+            ),
+            'CustomItalic': ParagraphStyle(
+                'CustomItalic', parent=styles['Normal'], fontSize=10, spaceAfter=12,
+                spaceBefore=4, textColor=gray_600, fontName='Helvetica-Oblique',
+                alignment=TA_CENTER, leading=14
+            ),
+            'CustomListItem': ParagraphStyle(
+                'CustomListItem', parent=styles['Normal'], fontSize=10, spaceAfter=6,
+                spaceBefore=2, textColor=gray_700, fontName='Helvetica', alignment=TA_LEFT,
+                leftIndent=20, leading=16
+            )
+        }
+
+        for style_name, style_obj in custom_styles.items():
+            styles.add(style_obj)
+
+        return styles
+
+    def _parse_html_to_elements(self, html_content):
+        """Parses HTML content and appends ReportLab elements to the story.
+
+        Args:
+            html_content (str): The HTML string to parse.
+        """
+        soup = BeautifulSoup(html_content, 'html.parser')
+
+        for element in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'blockquote', 'ul', 'ol', 'table', 'pre', 'code', 'hr', 'em', 'strong']):
+            if element.name == 'h1':
+                text = element.get_text().strip()
+                if not self.story:
+                    self.story.append(Paragraph(text, self.styles['CustomTitle']))
+                else:
+                    self.story.append(PageBreak())
+                    self.story.append(Paragraph(text, self.styles['CustomHeading1']))
+
+            elif element.name == 'h2':
+                text = element.get_text().strip()
+                self.story.append(Paragraph(text, self.styles['CustomHeading2']))
+
+            elif element.name == 'h3':
+                text = element.get_text().strip()
+                self.story.append(Paragraph(text, self.styles['CustomHeading3']))
+
+            elif element.name in ['h4', 'h5', 'h6']:
+                text = element.get_text().strip()
+                self.story.append(Paragraph(text, self.styles['CustomHeading3']))
+
+            elif element.name == 'p':
+                text = self._process_inline_elements(element)
+                if text.strip():
+                    if element.find('em') and len(element.get_text().strip()) < 100 and self.story and isinstance(self.story[-1], Paragraph) and self.story[-1].style == self.styles['CustomTitle']:
+                        self.story.append(Paragraph(text, self.styles['CustomItalic']))
+                    else:
+                        self.story.append(Paragraph(text, self.styles['CustomBody']))
+
+            elif element.name == 'blockquote':
+                text = element.get_text().strip()
+                self.story.append(Paragraph(text, self.styles['CustomBlockquote']))
+
+            elif element.name in ['ul', 'ol']:
+                self._process_list(element)
+
+            elif element.name == 'table':
+                self._process_table(element)
+
+            elif element.name == 'pre':
+                code_text = element.get_text()
+                self.story.append(Paragraph(f'<font name="Courier">{code_text}</font>', self.styles['CustomCode']))
+
+            elif element.name == 'hr':
+                self.story.append(Spacer(1, 16))
+                from reportlab.platypus import HRFlowable
+                hr = HRFlowable(width="100%", thickness=1, color=HexColor('#e5e7eb'), spaceAfter=0, spaceBefore=0)
+                self.story.append(hr)
+                self.story.append(Spacer(1, 16))
+
+    def _process_inline_elements(self, element):
+        """Processes inline HTML elements (bold, italic, code, links) for ReportLab.
+
+        Args:
+            element (bs4.Tag): The BeautifulSoup tag element to process.
+
+        Returns:
+            str: The HTML string with ReportLab-compatible inline styling.
+        """
+        html_str = str(element)
+        html_str = re.sub(r'<strong>(.*?)</strong>', r'<b>\1</b>', html_str)
+        html_str = re.sub(r'<em>(.*?)</em>', r'<i>\1</i>', html_str)
+        html_str = re.sub(r'<code>(.*?)</code>', r'<font name="Courier" backColor="#f3f4f6">\1</font>', html_str)
+        html_str = re.sub(r'<a[^>]*href="([^"]*)"[^>]*>(.*?)</a>', r'<font color="#2563eb">\2</font>', html_str)
+        html_str = re.sub(r'^<p[^>]*>', '', html_str)
+        html_str = re.sub(r'</p>$', '', html_str)
+        html_str = unescape(html_str)
+        return html_str
+
+    def _process_list(self, list_element):
+        """Processes HTML list elements (ul, ol) and adds them to the story.
+
+        Args:
+            list_element (bs4.Tag): The BeautifulSoup list element.
+        """
+        self.story.append(Spacer(1, 6))
+
+        items = list_element.find_all('li')
+        for i, item in enumerate(items):
+            text = self._process_inline_elements(item)
+            if list_element.name == 'ul':
+                list_text = f'<font name="Helvetica-Bold" size="10" color="{HexColor("#2563eb")}">•</font> {text}'
+            else:
+                list_text = f'{i+1}. {text}'
+
+            para = Paragraph(list_text, self.styles['CustomListItem'])
+            self.story.append(KeepTogether([para]))
+
+        self.story.append(Spacer(1, 10))
+
+    def _process_table(self, table_element):
+        """Processes HTML table elements and adds them to the story.
+
+        Args:
+            table_element (bs4.Tag): The BeautifulSoup table element.
+        """
+        rows_data = []
+
+        thead = table_element.find('thead')
+        if thead:
+            header_row = thead.find('tr')
+            if header_row:
+                header_cells = [Paragraph(cell.get_text().strip(), self.styles['CustomBody']) for cell in header_row.find_all(['th', 'td'])]
+                rows_data.append(header_cells)
+
+        tbody = table_element.find('tbody') or table_element
+        for row in tbody.find_all('tr'):
+            if row.parent.name != 'thead':
+                cells = [Paragraph(cell.get_text().strip(), self.styles['CustomBody']) for cell in row.find_all(['td', 'th'])]
+                if cells:
+                    rows_data.append(cells)
+
+        if rows_data:
+            num_cols = len(rows_data[0])
+            available_width = A4[0] - (2 * 3.2*cm)
+            col_widths = [available_width / num_cols] * num_cols
+
+            table = Table(rows_data, colWidths=col_widths)
+
+            table_style = [
+                ('BACKGROUND', (0, 0), (-1, 0), HexColor('#f3f4f6')),
+                ('TEXTCOLOR', (0, 0), (-1, 0), HexColor('#374151')),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('TOPPADDING', (0, 0), (-1, -1), 8),
+                ('LEFTPADDING', (0, 0), (-1, -1), 10),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 10),
+                ('GRID', (0, 0), (-1, -1), 0.5, HexColor('#e5e7eb')),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [None, HexColor('#f9fafb')]),
+                ('BOX', (0,0), (-1,-1), 1, HexColor('#e5e7eb')),
+            ]
+
+            table.setStyle(TableStyle(table_style))
+
+            self.story.append(Spacer(1, 12))
+            self.story.append(KeepTogether([table]))
+            self.story.append(Spacer(1, 16))
+
+    def convert_markdown_to_story(self, markdown_content):
+        """Converts markdown content to ReportLab story elements.
+
+        Args:
+            markdown_content (str): The Markdown string to convert.
+
+        Returns:
+            list: A list of ReportLab flowable objects representing the content.
+        """
+        html_content = markdown.markdown(
+            markdown_content,
+            extensions=['tables', 'fenced_code', 'nl2br']
+        )
+        self._parse_html_to_elements(html_content)
+        return self.story
+
+def create_sales_proposal_pdf(markdown_offer: str) -> str:
+    """Creates a PDF sales proposal file from Markdown content using ReportLab.
+
+    This function takes Markdown-formatted content, converts it into a styled
+    PDF document, and saves it to the current working directory. The PDF
+    includes custom branding, page layouts, and formatting for various
+    Markdown elements like headings, lists, tables, and code blocks.
 
     Args:
-        refined_requirements (str): The refined requirements in Markdown format.
+        markdown_offer (str): The Markdown content representing the sales proposal.
+
     Returns:
-        str: The file path of the created PDF offer file.
+        str: The absolute file path of the created PDF proposal.
+
+    Raises:
+        Exception: If an error occurs during PDF generation.
     """
     logger.info("Starting PDF generation process.")
-
-    # Determine base directory for temporary files
     current_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
-    logger.debug(f"Current working directory: {current_dir}")
-
-    # File names for temporary files
-    main_css_name = "styles.css"
-    page_template_css_name = "page_template_styles.css"
-    main_html_template_name = "offer_template.html"
-    page_html_template_name = "page_background_template.html"
-    output_pdf_file = "SalesShortcut_Proposal.pdf"
-
-    # Full paths for temporary files
-    main_css_path = os.path.join(current_dir, main_css_name)
-    page_template_css_path = os.path.join(current_dir, page_template_css_name)
-    main_html_template_path = os.path.join(current_dir, main_html_template_name)
-    page_html_template_path = os.path.join(current_dir, page_html_template_name)
-    output_pdf_path = os.path.abspath(os.path.join(current_dir, output_pdf_file))
-
-    temp_files = [main_css_path, page_template_css_path, main_html_template_path, page_html_template_path]
+    output_pdf_file = os.path.join(current_dir, "SalesShortcut_Proposal.pdf")
 
     try:
-        # --- Inline Main CSS Content (for the content card) ---
-        main_css_content = f"""
-/* Google Fonts Import */
-@import url('https://fonts.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap');
-@import url('https://com/css2?family=Roboto+Mono&display=swap'); /* For code blocks */
+        doc = SimpleDocTemplate(
+            output_pdf_file,
+            pagesize=A4,
+            rightMargin=3.2*cm,
+            leftMargin=3.2*cm,
+            topMargin=3.2*cm,
+            bottomMargin=2.8*cm,
+        )
 
-/* Design Tokens (Variables) */
-:root {{
-    --primary-color: #2563eb;
-    --primary-dark: #1d4ed8;
-    --secondary-color: #10b981;
-    --accent-color: #f59e0b;
-    --danger-color: #ef4444;
-    --warning-color: #f97316;
-    --success-color: #10b981;
-    
-    --gray-50: #f9fafb;
-    --gray-100: #f3f4f6;
-    --gray-200: #e5e7eb;
-    --gray-300: #d1d5db;
-    --gray-400: #9ca3af;
-    --gray-500: #6b7280;
-    --gray-600: #4b5563;
-    --gray-700: #374151;
-    --gray-800: #1f2937;
-    --gray-900: #111827;
-    
-    --border-radius: 8px;
-    --border-radius-lg: 12px;
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-    
-    --font-family-body: 'Roboto', sans-serif;
-    --font-family-heading: 'Inter', sans-serif;
-    --font-mono: 'Roboto Mono', monospace;
-}}
+        template_drawer = SalesShortcutTemplate(doc)
 
-/* WeasyPrint Page Rules for the main document flow */
-@page {{
-    size: A4;
-    margin: 0; /* Important: No margin on the main document flow, content card will handle spacing */
-    
-    /* Reference the page template for background and repeating header/footer */
-    @top-left {{ content: url('{os.path.basename(page_html_template_path)}'); }}
-}}
+        converter = MarkdownToPDFConverter()
+        story = converter.convert_markdown_to_story(markdown_offer)
 
-* {{
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}}
+        # Add initial spacing for aesthetic alignment with the custom page template
+        story.insert(0, Spacer(1, 0.8*cm))
 
-body {{
-    font-family: var(--font-family-body);
-    line-height: 1.6;
-    color: var(--gray-900);
-    /* Body has no background here, as it's handled by the page-template */
-}}
+        doc.build(story, onFirstPage=template_drawer, onLaterPages=template_drawer)
 
-/* Main Content Card - mimicking .main-card from screenshot */
-.pdf-wrapper {{
-    background: white;
-    border-radius: var(--border-radius-lg);
-    box-shadow: var(--shadow-xl);
-    overflow: hidden; /* For rounded corners and shadow */
-    width: 100%;
-    max-width: 700px; /* Width of the content card */
-    margin: 4cm auto 2cm; /* Top margin for banner, auto for horizontal centering, bottom margin */
-    padding: 2rem; /* Internal padding for card content */
-    box-sizing: border-box; /* Ensure padding is within width */
-    
-    /* Allow the content inside the card to break across pages */
-    page-break-inside: auto; 
-}}
+        logger.info(f"PDF successfully created: {output_pdf_file}")
+        return output_pdf_file
 
-/* Markdown Element Styling within the Card */
-h1 {{ /* Section headings like "0 · Purpose of This Document" */
-    font-family: var(--font-family-heading);
-    font-size: 1.6rem; 
-    font-weight: 600;
-    color: var(--primary-color);
-    margin-top: 1.5rem; /* Space above each new section heading */
-    margin-bottom: 0.8rem;
-    page-break-after: avoid; /* Keep heading with its content */
-}}
-
-h2 {{ /* Sub-section headings like "1 · Business & Website Goals" */
-    font-family: var(--font-family-heading);
-    font-size: 1.4rem; 
-    font-weight: 600;
-    color: var(--primary-color);
-    margin-top: 1.2rem;
-    margin-bottom: 0.6rem;
-    page-break-after: avoid;
-}}
-
-h3 {{
-    font-family: var(--font-family-heading);
-    font-size: 1.15rem; 
-    font-weight: 600;
-    color: var(--gray-900);
-    margin-top: 1rem;
-    margin-bottom: 0.5rem;
-    page-break-after: avoid;
-}}
-
-h4, h5, h6 {{
-    font-family: var(--font-family-heading);
-    color: var(--gray-800);
-    margin-top: 0.8rem;
-    margin-bottom: 0.4rem;
-    page-break-after: avoid;
-}}
-
-p {{
-    font-family: var(--font-family-body);
-    font-size: 0.95rem; /* Standard body text size */
-    color: var(--gray-700);
-    margin-bottom: 0.8rem;
-    line-height: 1.6;
-}}
-
-a {{
-    color: var(--primary-color);
-    text-decoration: none;
-}}
-
-a:hover {{
-    text-decoration: underline;
-}}
-
-strong {{
-    font-weight: 700;
-    color: var(--gray-900);
-}}
-
-em {{
-    font-style: italic;
-    color: var(--gray-600);
-}}
-
-ul, ol {{
-    margin-bottom: 0.8rem;
-    padding-left: 1.2rem;
-    color: var(--gray-700);
-}}
-
-li {{
-    margin-bottom: 0.4rem;
-}}
-
-table {{
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 1rem;
-    page-break-inside: auto; /* Allows tables to break across pages if too long */
-    border-radius: var(--border-radius);
-    overflow: hidden; /* Ensures border-radius applies to table content */
-    border: 1px solid var(--gray-200); /* Outer border for the table */
-}}
-
-table thead {{
-    display: table-header-group; /* Ensures table headers repeat on new pages */
-}}
-
-th, td {{
-    border: 1px solid var(--gray-200);
-    padding: 0.6rem 0.8rem; /* Padding within table cells */
-    text-align: left;
-    font-family: var(--font-family-body);
-    font-size: 0.9rem; /* Font size for table text */
-}}
-
-th {{
-    background-color: var(--gray-100);
-    font-weight: 600;
-    color: var(--gray-700);
-    border-bottom: 2px solid var(--gray-300); /* Stronger separator for header */
-}}
-
-/* Blockquote style similar to .process-info in the original CSS */
-blockquote {{
-    background: var(--gray-50);
-    border-radius: var(--border-radius);
-    padding: 1rem;
-    margin: 1rem 0;
-    border-left: 4px solid var(--primary-color); /* Primary color for border */
-    color: var(--gray-700);
-    font-style: normal; /* Override default markdown italic for blockquotes */
-    line-height: 1.6;
-}}
-
-blockquote p {{
-    margin-bottom: 0; /* Remove extra margin inside blockquote paragraphs */
-    font-size: 0.95rem;
-    color: var(--gray-700);
-}}
-
-hr {{
-    border: none;
-    border-top: 1px solid var(--gray-200);
-    margin: 1.5rem 0;
-}}
-
-pre, code {{
-    font-family: var(--font-mono);
-    background-color: var(--gray-100);
-    padding: 0.2em 0.4em;
-    border-radius: 4px;
-    font-size: 0.85em; /* Font size for inline code */
-    color: var(--gray-800);
-}}
-
-pre {{ /* Styling for fenced code blocks */
-    display: block;
-    padding: 0.8em;
-    margin: 0.8em 0;
-    overflow-x: auto; /* Allows horizontal scrolling for long lines */
-    border-radius: var(--border-radius);
-    border: 1px solid var(--gray-200);
-}}
-
-img {{
-    max-width: 100%;
-    height: auto;
-    display: block;
-    margin: 0.8rem auto;
-    border-radius: var(--border-radius);
-}}
-
-/* Ensure bold/italic styles in tables or other blocks inherit color */
-table strong, table em,
-blockquote strong, blockquote em {{
-    color: inherit; 
-}}
-"""
-        # --- Inline CSS for the Page Template (background and top banner) ---
-        page_template_css_content = """
-/* Google Fonts Import for the page template */
-@import url('https://fonts.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap');
-
-/* Design Tokens (Variables) - Must be redefined for page template's scope */
-:root {
-    --primary-color: #2563eb;
-    --primary-dark: #1d4ed8;
-    --accent-color: #f59e0b;
-    --gray-600: #4b5563;
-    --gray-900: #111827;
-    --font-family-body: 'Roboto', sans-serif;
-    --font-family-heading: 'Inter', sans-serif;
-}
-
-html, body {
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    width: 100%;
-    overflow: hidden; /* Prevent scrollbars on the page template */
-    position: relative; /* For absolute positioning of elements inside */
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /* Full page gradient */
-}
-
-/* Page Header - SalesShortcut logo and main proposal text */
-.page-header {
-    position: absolute;
-    top: 2cm; /* Matches @page margin from main document */
-    left: 50%;
-    transform: translateX(-50%);
-    width: 100%; /* Spans the width for centering */
-    max-width: 700px; /* Align with the main content card width */
-    text-align: center;
-    color: white; /* White text on gradient background */
-}
-
-.page-header .logo-text {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-}
-
-.page-header .logo-text .icon {
-    font-size: 2.5rem; /* Slightly larger icon */
-    color: var(--accent-color);
-}
-
-.page-header .logo-text h1 {
-    font-family: var(--font-family-heading);
-    font-size: 2.5rem; /* Larger main title */
-    font-weight: 700;
-    color: white; /* Solid white for main title on gradient */
-}
-
-.page-header .subtitle-text {
-    font-family: var(--font-family-body);
-    font-size: 1.1rem; /* Slightly larger subtitle */
-    opacity: 0.9;
-    font-weight: 300;
-    color: rgba(255, 255, 255, 0.9); /* Slightly transparent white */
-}
-
-/* Page Footer - Page numbers */
-.page-footer {
-    position: absolute;
-    bottom: 1cm; /* Adjust as needed from bottom */
-    left: 0;
-    width: 100%;
-    text-align: center;
-    font-family: var(--font-family-body);
-    font-size: 9pt;
-    color: var(--gray-600);
-}
-"""
-
-        # --- Inline Main HTML Template Content (for the main document flow) ---
-        main_html_template_content = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SalesShortcut Proposal</title>
-    <link rel="stylesheet" href="{main_css_name}">
-</head>
-<body>
-    <div class="pdf-wrapper">
-        <main>
-            {{{{ content | safe }}}}
-        </main>
-    </div>
-</body>
-</html>
-"""
-
-        logger.info("Converting Markdown to HTML.")
-        html_content = markdown.markdown(refined_requirements, extensions=['tables', 'fenced_code'])
-
-        # Simple extraction for the main title and subtitle from the markdown offer
-        document_main_title = "AI-Powered Lead Generation & Management Proposal"
-        document_main_subtitle = "Prepared by BrightWeb Studio"
-        
-        lines = refined_requirements.split('\n')
-        if lines:
-            # Extract content of the first H1
-            if lines[0].strip().startswith('#'):
-                document_main_title = lines[0].strip('# ').strip()
-            # Find the first italicized line after the H1
-            for i in range(1, min(len(lines), 3)): # Check first few lines for the subtitle
-                line = lines[i].strip()
-                if line.startswith('*') and line.endswith('*') and len(line) > 2:
-                    document_main_subtitle = line.strip('*').strip()
-                    break # Found the subtitle, stop searching
-        logger.info(f"Extracted document title: '{document_main_title}', subtitle: '{document_main_subtitle}'")
-
-        # --- Inline Page Background HTML Template Content ---
-        page_html_template_content_final = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Page Template</title>
-    <link rel="stylesheet" href="{os.path.basename(page_template_css_path)}">
-</head>
-<body>
-    <div class="page-header">
-        <div class="logo-text">
-            <span class="icon">&#x1F680;</span> <h1>SalesShortcut</h1>
-        </div>
-        <p class="subtitle-text">{document_main_title}<br><em>{document_main_subtitle}</em></p>
-    </div>
-    <div class="page-footer">
-        <span></span> / <span></span> 
-    </div>
-</body>
-</html>
-"""
-        
-        logger.info("Writing temporary CSS and HTML files.")
-        # Write temporary CSS files
-        with open(main_css_path, "w", encoding="utf-8") as f:
-            f.write(main_css_content)
-            logger.debug(f"Written main CSS to {main_css_path}")
-        with open(page_template_css_path, "w", encoding="utf-8") as f:
-            f.write(page_template_css_content)
-            logger.debug(f"Written page template CSS to {page_template_css_path}")
-
-        # Write temporary HTML templates
-        with open(main_html_template_path, "w", encoding="utf-8") as f:
-            f.write(main_html_template_content)
-            logger.debug(f"Written main HTML template to {main_html_template_path}")
-        
-        with open(page_html_template_path, "w", encoding="utf-8") as f:
-            f.write(page_html_template_content_final)
-            logger.debug(f"Written page background HTML template to {page_html_template_path}")
-
-        env = Environment(loader=FileSystemLoader(current_dir))
-        main_template = env.get_template(main_html_template_name)
-        
-        logger.info("Rendering main HTML template with Markdown content.")
-        rendered_main_html = main_template.render(content=html_content)
-
-        logger.info(f"Generating PDF: {output_pdf_path}")
-        # Load the main CSS file
-        main_css = CSS(filename=main_css_path, base_url=current_dir)
-        
-        # WeasyPrint will automatically load the page-template HTML and its associated CSS
-        # when it encounters the @top-left rule in main_css.
-        HTML(string=rendered_main_html, base_url=current_dir).write_pdf(output_pdf_path, stylesheets=[main_css])
-        
-        logger.info(f"PDF successfully created at: {output_pdf_path}")
-        return output_pdf_path
-
-    except FileNotFoundError as e:
-        logger.error(f"File not found error during PDF generation: {e}")
-        raise
     except Exception as e:
-        logger.exception(f"An unexpected error occurred during PDF generation: {e}")
+        logger.error(f"Error generating PDF: {e}", exc_info=True)
         raise
-    finally:
-        logger.info("Cleaning up temporary files.")
-        for f_path in temp_files:
-            if os.path.exists(f_path):
-                try:
-                    os.remove(f_path)
-                    logger.debug(f"Removed temporary file: {f_path}")
-                except OSError as e:
-                    logger.warning(f"Could not remove temporary file {f_path}: {e}")
-                    
-                    
-                    
-create_offer_file = FunctionTool(func=_create_offer_file)
+    
+create_offer_file = FunctionTool(func=create_sales_proposal_pdf)
