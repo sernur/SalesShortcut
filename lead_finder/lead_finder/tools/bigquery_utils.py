@@ -494,3 +494,162 @@ async def bigquery_query_leads(
 # Create function tools
 bigquery_upload_tool = FunctionTool(func=bigquery_upload)
 bigquery_query_leads_tool = FunctionTool(func=bigquery_query_leads)
+
+# --- NEW: No-Website Table Config ---
+NO_WEBSITE_TABLE_ID = "business_leads_no_websites"
+
+# --- NEW: No-Website Table Schema (same as business_leads, minus 'website') ---
+NO_WEBSITE_SCHEMA = [
+    bigquery.SchemaField("place_id", "STRING", mode="REQUIRED", description="Google Places ID"),
+    bigquery.SchemaField("name", "STRING", mode="REQUIRED", description="Business name"),
+    bigquery.SchemaField("address", "STRING", mode="NULLABLE", description="Formatted address"),
+    bigquery.SchemaField("phone", "STRING", mode="NULLABLE", description="Phone number"),
+    bigquery.SchemaField("category", "STRING", mode="NULLABLE", description="Business category"),
+    bigquery.SchemaField("rating", "FLOAT", mode="NULLABLE", description="Rating (1-5)"),
+    bigquery.SchemaField("total_ratings", "INTEGER", mode="NULLABLE", description="Number of ratings"),
+    bigquery.SchemaField("price_level", "INTEGER", mode="NULLABLE", description="Price level (0-4)"),
+    bigquery.SchemaField("is_open", "BOOLEAN", mode="NULLABLE", description="Currently open status"),
+    bigquery.SchemaField("city", "STRING", mode="REQUIRED", description="City searched"),
+    bigquery.SchemaField("search_type", "STRING", mode="NULLABLE", description="Type of search performed"),
+    bigquery.SchemaField("latitude", "FLOAT", mode="NULLABLE", description="Latitude"),
+    bigquery.SchemaField("longitude", "FLOAT", mode="NULLABLE", description="Longitude"),
+    bigquery.SchemaField("created_at", "TIMESTAMP", mode="REQUIRED", description="Record creation timestamp"),
+    bigquery.SchemaField("updated_at", "TIMESTAMP", mode="REQUIRED", description="Last update timestamp"),
+    bigquery.SchemaField("lead_status", "STRING", mode="NULLABLE", description="Lead qualification status"),
+    bigquery.SchemaField("contact_attempts", "INTEGER", mode="NULLABLE", description="Number of contact attempts"),
+    bigquery.SchemaField("last_contact_date", "TIMESTAMP", mode="NULLABLE", description="Last contact attempt date"),
+    bigquery.SchemaField("notes", "STRING", mode="NULLABLE", description="Additional notes"),
+]
+
+# --- NEW: Ensure No-Website Table Exists ---
+def ensure_no_website_table_exists(client, dataset_ref):
+    table_ref = dataset_ref.table(NO_WEBSITE_TABLE_ID)
+    try:
+        client.get_table(table_ref)
+        logger.info(f"Table {NO_WEBSITE_TABLE_ID} exists")
+    except NotFound:
+        logger.info(f"Creating table {NO_WEBSITE_TABLE_ID}")
+        table = bigquery.Table(table_ref, schema=NO_WEBSITE_SCHEMA)
+        table.description = "Business leads with no website info"
+        table.time_partitioning = bigquery.TimePartitioning(
+            type_=bigquery.TimePartitioningType.DAY,
+            field="created_at"
+        )
+        table.clustering_fields = ["city", "category", "lead_status"]
+        client.create_table(table)
+        logger.info(f"Table {NO_WEBSITE_TABLE_ID} created successfully with schema")
+    return table_ref
+
+# --- NEW: Upload Businesses Without Websites ---
+async def bigquery_no_website_upload(data: List[Dict[str, Any]], city: str = "", search_type: str = "general") -> Dict[str, Any]:
+    """
+    Upload businesses with no website to the business_leads_no_websites table.
+    """
+    # Filter out businesses that have a website
+    filtered = [b for b in data if not b.get("website")]
+    if not filtered:
+        return {"status": "success", "message": "No businesses without websites to upload", "stats": {"total": 0}}
+
+    # Use BigQuery client
+    client = BigQueryClient()
+    if not client.client:
+        # Fallback to mock upload
+        return await client._mock_upload(filtered, city, search_type)
+
+    # Ensure the no-website table exists
+    table_ref = ensure_no_website_table_exists(client.client, client.dataset_ref)
+
+    # Prepare and clean data (reuse validation, but skip website)
+    rows_to_insert = []
+    validation_errors = []
+    for i, business in enumerate(filtered):
+        try:
+            # Remove website field if present
+            business = dict(business)
+            business.pop("website", None)
+            # Add city and search_type
+            business["city"] = city
+            business["search_type"] = search_type
+            # Validate using the same logic, but ignore website
+            cleaned = client._validate_business_data(business)
+            cleaned.pop("website", None)
+            rows_to_insert.append(cleaned)
+        except Exception as e:
+            validation_errors.append(f"Business {i}: {str(e)}")
+            logger.warning(f"Validation error for business {i}: {e}")
+    if not rows_to_insert:
+        return {"status": "error", "message": "No valid businesses to upload", "validation_errors": validation_errors}
+    # Insert rows
+    def _insert_rows():
+        try:
+            errors = client.client.insert_rows_json(table_ref, rows_to_insert)
+            return errors
+        except Exception as e:
+            logger.error(f"Error in insert_rows_json (no website): {e}")
+            raise
+    import asyncio
+    errors = await asyncio.to_thread(_insert_rows)
+    if errors:
+        logger.error(f"BigQuery insertion errors (no website): {errors}")
+        return {
+            "status": "partial_success",
+            "message": f"Some rows failed to insert: {errors}",
+            "stats": {"total_input": len(filtered), "new_inserted": len(filtered) - len(errors), "failed": len(errors)},
+            "errors": errors,
+            "validation_errors": validation_errors
+        }
+    logger.info(f"Successfully uploaded {len(rows_to_insert)} businesses with no website to BigQuery")
+    return {
+        "status": "success",
+        "message": f"Successfully uploaded {len(rows_to_insert)} new businesses with no website",
+        "stats": {"total_input": len(filtered), "new_inserted": len(rows_to_insert), "failed": 0},
+        "validation_errors": validation_errors
+    }
+
+# --- NEW: Query Businesses Without Websites ---
+async def bigquery_query_no_website_leads(
+    city: Optional[str] = None,
+    category: Optional[str] = None,
+    min_rating: Optional[float] = None,
+    lead_status: Optional[str] = None,
+    limit: int = 100
+) -> Dict[str, Any]:
+    """
+    Query businesses from business_leads_no_websites table with filters.
+    """
+    client = BigQueryClient()
+    if not client.client:
+        return {"status": "error", "message": "BigQuery client not available"}
+    table_ref = ensure_no_website_table_exists(client.client, client.dataset_ref)
+    # Build WHERE clause
+    where_conditions = []
+    if city:
+        where_conditions.append(f"city = '{city}'")
+    if category:
+        where_conditions.append(f"category = '{category}'")
+    if min_rating:
+        where_conditions.append(f"rating >= {min_rating}")
+    if lead_status:
+        where_conditions.append(f"lead_status = '{lead_status}'")
+    where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
+    query = f"""
+        SELECT *
+        FROM `{PROJECT}.{DATASET_ID}.{NO_WEBSITE_TABLE_ID}`
+        WHERE {where_clause}
+        ORDER BY created_at DESC
+        LIMIT {limit}
+    """
+    def _run_query():
+        return [dict(row) for row in client.client.query(query)]
+    import asyncio
+    results = await asyncio.to_thread(_run_query)
+    return {
+        "status": "success",
+        "total_results": len(results),
+        "filters": {"city": city, "category": category, "min_rating": min_rating, "lead_status": lead_status},
+        "results": results
+    }
+
+# --- NEW: Tools for upload/query ---
+bigquery_no_website_upload_tool = FunctionTool(func=bigquery_no_website_upload)
+bigquery_query_no_website_leads_tool = FunctionTool(func=bigquery_query_no_website_leads)
