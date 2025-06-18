@@ -1,5 +1,5 @@
 from google.adk.agents.llm_agent import LlmAgent
-from .website_creator_prompts import PROMPT_PREPARE_PROMPT
+from ...outreach_email_prompt import PROMPT_PREPARE_PROMPT
 from sdr.sdr.config import MODEL
 
 prepare_prompt = LlmAgent(
