@@ -98,8 +98,9 @@ EMAIL_SENDER_AGENT_PROMPT = """
 
    ### INSTRUCTIONS
    1. Read the email content from the state['crafted_email'] key.
-   2. Use the `gmail_toolset` Gmail API to send the email with attachment PDF file at state['offer_file_path'].
-   
+   2. Use the `create_rfc822_message` tool to create a properly formatted email message with PDF file attachment at state['offer_file_path'].
+   3. Use the `gmail_toolset` Gmail API to send the email passing the created RFC822 message.
+
    ### OUTPUT
    Provide the email sending result in the following format:
    ```json
