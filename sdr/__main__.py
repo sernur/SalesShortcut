@@ -8,7 +8,7 @@ import common.config as defaults
 try:
     import uvicorn
     from starlette.routing import Route # <--- Import Route
-    from starlette.responses import PlainTextResponse # <--- Import PlainTextResponse
+    from starlette.responses import PlainTextResponse, JSONResponse # <--- Import PlainTextResponse and JSONResponse
     from starlette.requests import Request # <--- Import Request
     from a2a.server.apps import A2AStarletteApplication
     from a2a.server.request_handlers import DefaultRequestHandler
@@ -162,6 +162,30 @@ def main(host: str, port: int):
                     str(request.query_params.get('state')),
                     str(request.url)
                 ),
+            )
+        )
+        # Human input callback endpoint for UI to notify agent of human response
+        from sdr.sdr.sub_agents.outreach_email_agent.sub_agents.website_creator.tools.human_creation_tool import submit_human_response
+
+        async def human_input_callback(request: Request):
+            request_id = request.path_params.get('request_id')
+            try:
+                data = await request.json()
+            except Exception:
+                return JSONResponse({'status': 'failed', 'message': 'Invalid JSON'}, status_code=400)
+            url = data.get('url')
+            if not request_id or not url:
+                return JSONResponse({'status': 'failed', 'message': 'Missing request_id or url'}, status_code=400)
+            success = submit_human_response(request_id, url)
+            if success:
+                return JSONResponse({'status': 'success', 'request_id': request_id})
+            return JSONResponse({'status': 'failed', 'message': 'Invalid request ID or request not pending'}, status_code=404)
+
+        app.routes.append(
+            Route(
+                path='/api/human-input/{request_id}',
+                methods=['POST'],
+                endpoint=human_input_callback
             )
         )
 

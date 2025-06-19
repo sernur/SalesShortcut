@@ -889,20 +889,26 @@ async def submit_human_input_response(request_id: str, response: HumanInputRespo
     
     logger.info(f"Human input response submitted for {request_id}: {response.response}")
     
-    # Try to notify the human creation tool via HTTP callback FIRST
+    # Try to notify the human creation tool via HTTP callback to SDR agent
     success = False
+    agent_url = os.environ.get("SDR_SERVICE_URL", config.DEFAULT_SDR_URL).rstrip("/")
+    callback_url = f"{agent_url}/api/human-input/{request_id}"
     try:
-        # Import here to avoid circular imports
-        from sdr.sdr.sub_agents.outreach_email_agent.sub_agents.website_creator.tools.human_creation_tool import submit_human_response
-        
-        # Submit the response to the human creation tool
-        success = submit_human_response(request_id, response.response)
-        if success:
-            logger.info(f"Successfully notified human creation tool for request {request_id}")
-        else:
-            logger.warning(f"Failed to notify human creation tool for request {request_id}")
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            agent_resp = await client.post(
+                callback_url,
+                json={"url": response.response},
+                headers={"Content-Type": "application/json"}
+            )
+            if agent_resp.status_code == 200:
+                logger.info(f"Successfully notified human creation tool on agent for request {request_id}")
+                success = True
+            else:
+                logger.warning(f"Agent returned status {agent_resp.status_code} for request {request_id}: {agent_resp.text}")
+    except httpx.ConnectError:
+        logger.warning(f"Connection to SDR agent failed for request {request_id}")
     except Exception as e:
-        logger.error(f"Error notifying human creation tool: {e}")
+        logger.error(f"Error notifying SDR agent for request {request_id}: {e}")
     
     # Only remove the request from UI state AFTER successful processing
     if success:
