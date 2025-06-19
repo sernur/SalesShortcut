@@ -79,7 +79,6 @@ class AgentType(str, Enum):
     LEAD_FINDER = "lead_finder"
     SDR = "sdr"
     LEAD_MANAGER = "lead_manager"
-    CALENDAR_ASSISTANT = "calendar_assistant"
 
 # Data Models
 class Business(BaseModel):
@@ -885,12 +884,13 @@ async def submit_human_input_response(request_id: str, response: HumanInputRespo
             content={"error": "Request not found"}
         )
     
-    # Remove the request from pending list
-    original_request = app_state["human_input_requests"].pop(request_id)
+    # Get the request first (but don't remove it yet)
+    original_request = app_state["human_input_requests"].get(request_id)
     
     logger.info(f"Human input response submitted for {request_id}: {response.response}")
     
-    # Try to notify the human creation tool via HTTP callback
+    # Try to notify the human creation tool via HTTP callback FIRST
+    success = False
     try:
         # Import here to avoid circular imports
         from sdr.sdr.sub_agents.outreach_email_agent.sub_agents.website_creator.tools.human_creation_tool import submit_human_response
@@ -903,6 +903,10 @@ async def submit_human_input_response(request_id: str, response: HumanInputRespo
             logger.warning(f"Failed to notify human creation tool for request {request_id}")
     except Exception as e:
         logger.error(f"Error notifying human creation tool: {e}")
+    
+    # Only remove the request from UI state AFTER successful processing
+    if success:
+        app_state["human_input_requests"].pop(request_id, None)
     
     # Send WebSocket notification that response was submitted
     await manager.send_update({
@@ -941,7 +945,6 @@ if __name__ == "__main__":
     logger.info(f"  Lead Finder: python -m lead_finder --port {config.DEFAULT_LEAD_FINDER_PORT}")
     logger.info(f"  SDR: python -m sdr --port {config.DEFAULT_SDR_PORT}")
     logger.info(f"  Lead Manager: python -m lead_manager --port {config.DEFAULT_LEAD_MANAGER_PORT}")
-    logger.info(f"  Calendar Assistant: python -m calendar_assistant --port {config.DEFAULT_CALENDAR_ASSISTANT_PORT}")
     logger.info(f"--- Access UI at http://0.0.0.0:{config.DEFAULT_UI_CLIENT_PORT} ---")
     
     uvicorn.run(

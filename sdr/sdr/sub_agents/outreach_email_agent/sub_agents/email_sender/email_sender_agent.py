@@ -22,8 +22,8 @@ gmail_toolset.configure_auth(
     client_secret=GOOGLE_CLOUD_CLIENT_SECRET
 )
 
-email_agent = LlmAgent(
-    name="EmailAgent",
+email_sender_agent = LlmAgent(
+    name="EmailSenderAgent",
     description="Agent that crafts and sends personalized business outreach emails with commercial offers",
     model=MODEL,
     instruction=EMAIL_SENDER_AGENT_PROMPT,

@@ -10,7 +10,6 @@ from html import unescape
 from urllib.parse import urlparse
 
 from google.adk.tools import FunctionTool
-from sdr.sdr.config import TEST_MODE
 
 # ReportLab imports
 from reportlab.lib.pagesizes import A4
@@ -414,14 +413,6 @@ def create_sales_proposal_pdf(markdown_offer: str) -> str:
     logger.info("Starting PDF generation process with `create_sales_proposal_pdf` function.")
     logger.debug(f"Markdown content length: {len(markdown_offer)} characters")
     
-    if TEST_MODE:
-        logger.info("TEST MODE: Returning mock PDF file path")
-        mock_pdf_path = "/tmp/mock_SalesShortcut_Proposal.pdf"
-        logger.info(f"TEST MODE: Mock PDF created at {mock_pdf_path}")
-        # Create a dummy file for testing
-        with open(mock_pdf_path, 'w') as f:
-            f.write("Mock PDF content for testing")
-        return mock_pdf_path
     
     current_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
     output_pdf_file = os.path.join(current_dir, "SalesShortcut_Proposal.pdf")

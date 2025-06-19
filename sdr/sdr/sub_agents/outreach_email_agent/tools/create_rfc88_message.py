@@ -4,9 +4,10 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 import os # Import os for path handling
+from typing import Optional, List
 
 
-def create_rfc822_message(to_email: str, subject: str, body: str, file_paths: list = None):
+def create_rfc822_message(to_email: str, subject: str, body: str, file_paths: Optional[List[str]] = None):
     """
     Creates an RFC822 formatted message string with optional attachments that Gmail API can use.
     

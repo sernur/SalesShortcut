@@ -12,7 +12,6 @@ import httpx
 from google.adk.tools import FunctionTool, ToolContext
 
 from common.config import DEFAULT_UI_CLIENT_URL
-from sdr.sdr.config import TEST_MODE
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +117,7 @@ async def wait_for_human_response(request_id: str, timeout: int = 300) -> Option
             
         if request.status == RequestStatus.COMPLETED:
             logger.info(f"Request {request_id} completed with URL: {request.url_response}")
+            # Don't cleanup here - let the main function handle it to avoid race condition
             return request.url_response
             
         if request.status == RequestStatus.CANCELLED:
@@ -153,11 +153,6 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
     logger.info(f"📋 Prompt: {website_creation_prompt[:100]}...")
     logger.debug(f"Full prompt: {website_creation_prompt}")
     
-    # if TEST_MODE:
-    #     logger.info("TEST MODE: Returning mock website URL")
-    #     mock_url = f"https://mock-website-{uuid.uuid4().hex[:8]}.example.com"
-    #     logger.info(f"TEST MODE: Mock website created at {mock_url}")
-    #     return mock_url
     
     manager = HumanInteractionManager()
     
@@ -189,7 +184,8 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
             logger.info("▶️  WORKFLOW RESUMED - Human response received")
             logger.info("=" * 50)
             
-            # Cleanup
+            # Add a small delay before cleanup to allow UI to complete its callback
+            await asyncio.sleep(2)
             manager.cleanup_request(request_id)
             return url_response
         else:

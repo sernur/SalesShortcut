@@ -4,15 +4,13 @@ A comprehensive AI-powered Sales Development Representative (SDR) system built w
 
 ## 🏗️ Architecture
 
-SalesShortcut consists of 6 specialized microservices working together:
+SalesShortcut consists of 4 specialized microservices working together:
 
 ### Core Services
 
 - **🔍 Lead Finder** - Discovers potential business leads in specified cities using Google Maps and location-based search
-- **🧠 SDR Agent** - Main orchestrator conducting research, proposal generation, and phone outreach
-- **📧 Outreach Agent** - Handles phone calls and email communications with prospects
+- **🧠 SDR Agent** - Main orchestrator conducting research, proposal generation, and outreach (includes phone calls and email)
 - **📋 Lead Manager** - Manages lead data and tracks conversion status
-- **📅 Calendar Assistant** - Schedules meetings and manages follow-up activities
 - **🖥️ UI Client** - Web dashboard for monitoring and controlling the entire system
 
 ### Agent Workflow
@@ -127,11 +125,9 @@ pip install -r requirements.txt
 ./deploy_local.sh
 
 # Or start individual services
-python -m lead_finder --port 8001
-python -m sdr --port 8002  
-python -m outreach --port 8003
-python -m lead_manager --port 8004
-python -m calendar_assistant --port 8005
+python -m lead_finder --port 8081
+python -m lead_manager --port 8082
+python -m sdr --port 8084  
 python -m ui_client --port 8000
 ```
 
@@ -184,11 +180,9 @@ TOP_K = 40
 ### Service URLs
 Services communicate via HTTP/A2A protocol. Default ports:
 - UI Client: 8000
-- Lead Finder: 8001  
-- SDR: 8002
-- Outreach: 8003
-- Lead Manager: 8004
-- Calendar Assistant: 8005
+- Lead Finder: 8081  
+- Lead Manager: 8082
+- SDR: 8084
 
 ## 🐳 Docker Deployment
 
