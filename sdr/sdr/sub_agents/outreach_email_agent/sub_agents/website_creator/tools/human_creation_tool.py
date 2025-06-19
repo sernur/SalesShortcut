@@ -149,6 +149,14 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
     Returns:
         str: URL for the created website or error message.
     """
+    # If we've already received a website preview link in state, skip re-requesting
+    try:
+        existing_url = tool_context.state.get("website_preview_link", "") if tool_context else ""
+    except Exception:
+        existing_url = None
+    if existing_url:
+        logger.info(f"Skipping human creation: existing website_preview_link found: {existing_url}")
+        return existing_url
     logger.info("🤖 AGENT: Requesting human website creation")
     logger.info(f"📋 Prompt: {website_creation_prompt[:100]}...")
     logger.debug(f"Full prompt: {website_creation_prompt}")
