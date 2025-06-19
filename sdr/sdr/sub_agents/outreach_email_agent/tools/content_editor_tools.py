@@ -2,7 +2,6 @@
 
 import logging
 from google.adk.tools import FunctionTool
-from sdr.sdr.config import TEST_MODE
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +20,6 @@ def edit_proposal_content(current_content: str, edit_instructions: str) -> str:
         logger.info(f"Processing content edit request - Instructions: {edit_instructions[:100]}...")
         logger.debug(f"Current content length: {len(current_content)} characters")
         
-        if TEST_MODE:
-            logger.info("TEST MODE: Returning mock edited content")
-            mock_content = current_content + f"\n\n<!-- MOCK EDIT: {edit_instructions} -->"
-            logger.info(f"TEST MODE: Mock edit applied, new length: {len(mock_content)} characters")
-            return mock_content
         
         # This function allows the agent to modify the proposal content
         # The agent can provide specific edit instructions and this tool
@@ -59,11 +53,6 @@ def replace_content_section(current_content: str, section_name: str, new_section
         logger.info(f"Replacing section: {section_name}")
         logger.debug(f"New section content length: {len(new_section_content)} characters")
         
-        if TEST_MODE:
-            logger.info(f"TEST MODE: Returning mock section replacement for '{section_name}'")
-            mock_content = current_content.replace(f"## {section_name}", f"## {section_name} (MOCK REPLACED)")
-            logger.info(f"TEST MODE: Mock section replacement completed")
-            return mock_content
         
         import re
         
@@ -105,11 +94,6 @@ def add_content_section(current_content: str, section_name: str, section_content
         logger.info(f"Adding new section: {section_name} at position: {position}")
         logger.debug(f"Section content length: {len(section_content)} characters")
         
-        if TEST_MODE:
-            logger.info(f"TEST MODE: Returning mock section addition for '{section_name}'")
-            mock_content = current_content + f"\n\n## {section_name} (MOCK ADDED)\n{section_content[:50]}..."
-            logger.info(f"TEST MODE: Mock section addition completed")
-            return mock_content
         
         new_section = f"\n\n## {section_name}\n{section_content}"
         

@@ -120,6 +120,9 @@ class DashboardManager {
                 console.log('Matched human_input_request case!');
                 this.handleHumanInputRequest(data);
                 break;
+            case 'human_input_response_submitted':
+                this.handleHumanInputResponseSubmitted(data);
+                break;
             default:
                 console.log('Unknown message type:', data.type);
         }
@@ -141,6 +144,9 @@ class DashboardManager {
         // Update UI
         this.updateStats();
         this.updateAgentStatuses(data.is_running);
+        
+        // Don't close human input dialog on initial state - it might be legitimate state refresh
+        // Only close dialog if it was just submitted (check for success message)
     }
     
     handleBusinessAdded(data) {
@@ -378,7 +384,7 @@ class DashboardManager {
             'not_interested': 'sdr',
             'no_response': 'sdr',
             'converting': 'lead_manager',
-            'meeting_scheduled': 'calendar_assistant'
+            'meeting_scheduled': 'lead_manager'
         };
         
         const agentType = statusToAgent[status];
@@ -395,7 +401,7 @@ class DashboardManager {
             'not_interested': 'sdr',
             'no_response': 'sdr',
             'converting': 'lead_manager',
-            'meeting_scheduled': 'calendar_assistant'
+            'meeting_scheduled': 'lead_manager'
         };
         
         return statusToAgent[status] || 'unknown';
@@ -470,7 +476,7 @@ class DashboardManager {
     }
     
     updateAgentStatuses(isRunning) {
-        const agents = ['lead-finder', 'sdr', 'lead-manager', 'calendar'];
+        const agents = ['lead-finder', 'sdr', 'lead-manager'];
         agents.forEach(agent => {
             this.updateAgentStatus(agent.replace('-', '_'), isRunning);
         });
@@ -588,6 +594,14 @@ class DashboardManager {
         // Show the human input modal
         showHumanInputDialog(data);
         console.log('Human input dialog show function called');
+    }
+    
+    handleHumanInputResponseSubmitted(data) {
+        console.log('Human input response submitted:', data);
+        this.addActivityLogEntry('sdr', `Website URL submitted: ${data.response}`, data.timestamp);
+        
+        // Close the human input dialog if it's still open
+        closeHumanInputDialog();
     }
     
     showSdrDialog(business) {
@@ -766,6 +780,63 @@ class DashboardManager {
     }
 }
 
+// Global toast function
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    
+    let backgroundColor;
+    switch(type) {
+        case 'success':
+            backgroundColor = '#10b981';
+            break;
+        case 'error':
+            backgroundColor = '#ef4444';
+            break;
+        case 'warning':
+            backgroundColor = '#f59e0b';
+            break;
+        default:
+            backgroundColor = '#3b82f6';
+    }
+    
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${backgroundColor};
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        z-index: 10001;
+        max-width: 400px;
+        font-weight: 500;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease;
+    `;
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    
+    // Trigger animation
+    requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(0)';
+    });
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.remove();
+            }
+        }, 300);
+    }, 4000);
+}
+
 // Global functions
 function resetDashboard() {
     if (confirm('Are you sure you want to reset the dashboard and start a new search?')) {
@@ -884,10 +955,20 @@ function copyPromptToClipboard() {
     const promptTextarea = document.getElementById('human-input-prompt');
     if (promptTextarea) {
         promptTextarea.select();
-        document.execCommand('copy');
         
-        // Show success feedback
-        showToast('Prompt copied to clipboard!', 'success');
+        // Use modern clipboard API if available, fallback to execCommand
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(promptTextarea.value).then(() => {
+                showToast('Prompt copied to clipboard!', 'success');
+            }).catch(() => {
+                // Fallback to execCommand
+                document.execCommand('copy');
+                showToast('Prompt copied to clipboard!', 'success');
+            });
+        } else {
+            document.execCommand('copy');
+            showToast('Prompt copied to clipboard!', 'success');
+        }
     }
 }
 
@@ -937,9 +1018,9 @@ async function submitWebsiteUrl() {
         });
         
         if (response.ok) {
-            const result = await response.json();
+            await response.json(); // Response received but not used
             showToast('Website URL submitted successfully!', 'success');
-            closeHumanInputDialog();
+            // Don't close dialog here - let WebSocket message handle it to avoid race condition
         } else {
             const error = await response.json();
             showToast(`Error: ${error.message || 'Failed to submit URL'}`, 'error');

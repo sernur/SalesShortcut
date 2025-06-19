@@ -234,63 +234,6 @@
                 </div>
             </div>
 
-            <!-- Calendar Agent Column -->
-            <div class="agent-column calendar-column" data-agent="calendar_assistant">
-                <div class="column-header">
-                    <div class="agent-icon">
-                        <i class="fas fa-calendar-check"></i>
-                    </div>
-                    <div class="agent-info">
-                        <h3>Calendar Agent</h3>
-                        <p>Scheduling meetings</p>
-                    </div>
-                    <div class="agent-status" id="calendar-status">
-                        <div class="status-indicator idle"></div>
-                    </div>
-                </div>
-                
-                <div class="column-content" id="calendar-content">
-                    {% for business in businesses %}
-                        {% if business.status == 'meeting_scheduled' %}
-                        <div class="business-card compact meeting-card" data-business-id="{{ business.id }}">
-                            <div class="business-header">
-                                <div class="business-title">
-                                    <i class="fas fa-handshake meeting-icon"></i>
-                                    <h4>{{ business.name }}</h4>
-                                </div>
-                                <span class="status-badge status-meeting">Meeting</span>
-                            </div>
-                            <div class="business-details">
-                                <div class="detail">
-                                    <i class="fas fa-map-marker-alt"></i>
-                                    <span>{{ business.city }}</span>
-                                </div>
-                                <div class="contact-row">
-                                    {% if business.phone %}
-                                    <div class="contact-item">
-                                        <i class="fas fa-phone"></i>
-                                        <span>{{ business.phone }}</span>
-                                    </div>
-                                    {% endif %}
-                                    {% if business.email %}
-                                    <div class="contact-item">
-                                        <i class="fas fa-envelope"></i>
-                                        <span>{{ business.email[:20] }}{% if business.email|length > 20 %}...{% endif %}</span>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                                {% if business.notes %}
-                                <div class="compact-notes">
-                                    <i class="fas fa-calendar-check"></i>
-                                    <span>{{ business.notes[-1][:50] }}{% if business.notes[-1]|length > 50 %}...{% endif %}</span>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-            </div>
         </div>
 
         <!-- Activity Log -->
