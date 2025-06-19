@@ -150,6 +150,14 @@ class SDRAgentExecutor(AgentExecutor):
             )
             return
 
+        # Initialize optional state variables to avoid missing context errors in subsequent agents
+        # e.g., offer_file_path and website_preview_link used by the email agent templates
+        try:
+            session.state.setdefault("offer_file_path", "")
+            session.state.setdefault("website_preview_link", "")
+        except Exception:
+            logger.warning(f"Task {context.task_id}: Unable to set default state keys for offer_file_path or website_preview_link")
+
         # Execute the ADK Agent
         try:
             logger.info(f"Task {context.task_id}: Calling ADK run_async for business: {business_name}")
