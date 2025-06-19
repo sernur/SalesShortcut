@@ -10,6 +10,7 @@ load_dotenv()
 
 # Model configuration
 MODEL = os.getenv("MODEL", "gemini-2.0-flash-lite")
+MODEL_THINK = os.getenv("MODEL_THINK", "gemini-2.5-flash-preview-05-20")
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.2"))
 TOP_P = float(os.getenv("TOP_P", "0.95"))
 TOP_K = int(os.getenv("TOP_K", "40"))
@@ -31,3 +32,14 @@ ELEVENLABS_PHONE_NUMBER_ID = os.getenv("ELEVENLABS_PHONE_NUMBER_ID", "")
 TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
 TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
 TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER", "")
+
+
+# Google Cloud Client ID for OAuth
+GOOGLE_CLOUD_CLIENT_ID = os.getenv("GOOGLE_CLOUD_CLIENT_ID", "")
+GOOGLE_CLOUD_CLIENT_SECRET = os.getenv("GOOGLE_CLOUD_CLIENT_SECRET", "")
+
+# Test mode configuration
+TEST_MODE = os.getenv("TEST", "false").lower() == "true"
+
+# UI service configuration
+UI_SERVICE_ENABLED = os.getenv("UI_SERVICE_ENABLED", "true").lower() == "true"

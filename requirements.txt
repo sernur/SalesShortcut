@@ -1,8 +1,6 @@
 # Service-specific requirements
--r calendar_assistant/requirements.txt
 -r lead_finder/requirements.txt
 -r lead_manager/requirements.txt
--r outreach/requirements.txt
 -r sdr/requirements.txt
 -r ui_client/requirements.txt
 

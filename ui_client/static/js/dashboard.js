@@ -83,6 +83,7 @@ class DashboardManager {
     
     handleWebSocketMessage(data) {
         console.log('Received WebSocket message:', data);
+        console.log('Message type is:', data.type, 'Type of:', typeof data.type);
         
         switch (data.type) {
             case 'initial_state':
@@ -115,6 +116,13 @@ class DashboardManager {
             case 'sdr_engaged':
                 this.handleSdrEngaged(data);
                 break;
+            case 'human_input_request':
+                console.log('Matched human_input_request case!');
+                this.handleHumanInputRequest(data);
+                break;
+            case 'human_input_response_submitted':
+                this.handleHumanInputResponseSubmitted(data);
+                break;
             default:
                 console.log('Unknown message type:', data.type);
         }
@@ -136,6 +144,9 @@ class DashboardManager {
         // Update UI
         this.updateStats();
         this.updateAgentStatuses(data.is_running);
+        
+        // Don't close human input dialog on initial state - it might be legitimate state refresh
+        // Only close dialog if it was just submitted (check for success message)
     }
     
     handleBusinessAdded(data) {
@@ -373,7 +384,7 @@ class DashboardManager {
             'not_interested': 'sdr',
             'no_response': 'sdr',
             'converting': 'lead_manager',
-            'meeting_scheduled': 'calendar_assistant'
+            'meeting_scheduled': 'lead_manager'
         };
         
         const agentType = statusToAgent[status];
@@ -390,7 +401,7 @@ class DashboardManager {
             'not_interested': 'sdr',
             'no_response': 'sdr',
             'converting': 'lead_manager',
-            'meeting_scheduled': 'calendar_assistant'
+            'meeting_scheduled': 'lead_manager'
         };
         
         return statusToAgent[status] || 'unknown';
@@ -465,7 +476,7 @@ class DashboardManager {
     }
     
     updateAgentStatuses(isRunning) {
-        const agents = ['lead-finder', 'sdr', 'lead-manager', 'calendar'];
+        const agents = ['lead-finder', 'sdr', 'lead-manager'];
         agents.forEach(agent => {
             this.updateAgentStatus(agent.replace('-', '_'), isRunning);
         });
@@ -573,6 +584,24 @@ class DashboardManager {
         if (dialog && !dialog.classList.contains('hidden')) {
             this.closeSdrDialog();
         }
+    }
+    
+    handleHumanInputRequest(data) {
+        console.log('Received human input request:', data);
+        console.log('About to show human input dialog...');
+        this.addActivityLogEntry('sdr', 'Requesting human input for website creation', data.timestamp);
+        
+        // Show the human input modal
+        showHumanInputDialog(data);
+        console.log('Human input dialog show function called');
+    }
+    
+    handleHumanInputResponseSubmitted(data) {
+        console.log('Human input response submitted:', data);
+        this.addActivityLogEntry('sdr', `Website URL submitted: ${data.response}`, data.timestamp);
+        
+        // Close the human input dialog if it's still open
+        closeHumanInputDialog();
     }
     
     showSdrDialog(business) {
@@ -751,6 +780,63 @@ class DashboardManager {
     }
 }
 
+// Global toast function
+function showToast(message, type = 'info') {
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    
+    let backgroundColor;
+    switch(type) {
+        case 'success':
+            backgroundColor = '#10b981';
+            break;
+        case 'error':
+            backgroundColor = '#ef4444';
+            break;
+        case 'warning':
+            backgroundColor = '#f59e0b';
+            break;
+        default:
+            backgroundColor = '#3b82f6';
+    }
+    
+    toast.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: ${backgroundColor};
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        z-index: 10001;
+        max-width: 400px;
+        font-weight: 500;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease;
+    `;
+    toast.textContent = message;
+    
+    document.body.appendChild(toast);
+    
+    // Trigger animation
+    requestAnimationFrame(() => {
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateX(0)';
+    });
+    
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            if (toast.parentNode) {
+                toast.remove();
+            }
+        }, 300);
+    }, 4000);
+}
+
 // Global functions
 function resetDashboard() {
     if (confirm('Are you sure you want to reset the dashboard and start a new search?')) {
@@ -814,3 +900,159 @@ document.addEventListener('visibilitychange', function() {
         console.log('Page visible, ensuring WebSocket is connected');
     }
 });
+
+// Human Input Modal Functions
+let currentHumanInputRequest = null;
+
+function showHumanInputDialog(requestData) {
+    console.log('Showing human input dialog:', requestData);
+    
+    currentHumanInputRequest = requestData;
+    
+    // Populate the prompt
+    const promptTextarea = document.getElementById('human-input-prompt');
+    if (promptTextarea) {
+        promptTextarea.value = requestData.prompt || '';
+    }
+    
+    // Show the modal
+    const overlay = document.getElementById('human-input-dialog-overlay');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        
+        // Add fade-in animation
+        overlay.style.opacity = '0';
+        setTimeout(() => {
+            overlay.style.opacity = '1';
+        }, 10);
+    }
+    
+    // Clear previous URL input
+    const urlInput = document.getElementById('website-url-input');
+    if (urlInput) {
+        urlInput.value = '';
+    }
+    
+    // Focus on URL input
+    setTimeout(() => {
+        if (urlInput) {
+            urlInput.focus();
+        }
+    }, 300);
+}
+
+function closeHumanInputDialog() {
+    const overlay = document.getElementById('human-input-dialog-overlay');
+    if (overlay) {
+        overlay.classList.add('hidden');
+        overlay.style.opacity = '0';
+    }
+    
+    currentHumanInputRequest = null;
+}
+
+function copyPromptToClipboard() {
+    const promptTextarea = document.getElementById('human-input-prompt');
+    if (promptTextarea) {
+        promptTextarea.select();
+        
+        // Use modern clipboard API if available, fallback to execCommand
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(promptTextarea.value).then(() => {
+                showToast('Prompt copied to clipboard!', 'success');
+            }).catch(() => {
+                // Fallback to execCommand
+                document.execCommand('copy');
+                showToast('Prompt copied to clipboard!', 'success');
+            });
+        } else {
+            document.execCommand('copy');
+            showToast('Prompt copied to clipboard!', 'success');
+        }
+    }
+}
+
+function openFirebaseStudio() {
+    // Open Firebase Studio in a new tab
+    window.open('https://studio.firebase.google.com/', '_blank');
+}
+
+async function submitWebsiteUrl() {
+    if (!currentHumanInputRequest) {
+        showToast('No active request found', 'error');
+        return;
+    }
+    
+    const urlInput = document.getElementById('website-url-input');
+    const submitBtn = document.getElementById('submit-website-url-btn');
+    
+    if (!urlInput.value.trim()) {
+        showToast('Please enter a website URL', 'error');
+        urlInput.focus();
+        return;
+    }
+    
+    // Validate URL format
+    try {
+        new URL(urlInput.value.trim());
+    } catch (e) {
+        showToast('Please enter a valid URL', 'error');
+        urlInput.focus();
+        return;
+    }
+    
+    // Show loading state
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+    
+    try {
+        const response = await fetch(`/api/human-input/${currentHumanInputRequest.request_id}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                request_id: currentHumanInputRequest.request_id,
+                response: urlInput.value.trim()
+            })
+        });
+        
+        if (response.ok) {
+            await response.json(); // Response received but not used
+            showToast('Website URL submitted successfully!', 'success');
+            // Don't close dialog here - let WebSocket message handle it to avoid race condition
+        } else {
+            const error = await response.json();
+            showToast(`Error: ${error.message || 'Failed to submit URL'}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error submitting website URL:', error);
+        showToast('Error submitting URL. Please try again.', 'error');
+    } finally {
+        // Reset button state
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-check"></i> Submit URL';
+    }
+}
+
+// Handle ESC key for human input modal
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        const overlay = document.getElementById('human-input-dialog-overlay');
+        if (overlay && !overlay.classList.contains('hidden')) {
+            closeHumanInputDialog();
+        }
+    }
+});
+
+// Test function to manually trigger human input dialog
+function testHumanInputDialog() {
+    const testData = {
+        request_id: 'test-' + Date.now(),
+        prompt: 'Create a professional website for a local bakery called "Sweet Dreams Bakery". The website should include:\n\n1. A welcoming homepage with beautiful images of baked goods\n2. An about page telling the story of the bakery\n3. A menu page showcasing different products (breads, pastries, cakes)\n4. Contact information and location\n5. Online ordering capability\n6. Modern, clean design with warm colors\n7. Mobile-responsive layout\n\nThe target audience is local residents who appreciate fresh, artisanal baked goods. The tone should be warm, inviting, and family-friendly.',
+        input_type: 'website_creation',
+        timestamp: new Date().toISOString()
+    };
+    
+    showHumanInputDialog(testData);
+}

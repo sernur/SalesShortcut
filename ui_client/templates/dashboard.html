@@ -35,6 +35,12 @@
                     <i class="fas fa-refresh"></i>
                     New Search
                 </button>
+                
+                <!-- Debug button for testing human input dialog -->
+                <button onclick="testHumanInputDialog()" style="margin-left: 10px; padding: 8px 12px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">
+                    <i class="fas fa-globe"></i>
+                    Test Human Input
+                </button>
             </div>
         </div>
 
@@ -228,63 +234,6 @@
                 </div>
             </div>
 
-            <!-- Calendar Agent Column -->
-            <div class="agent-column calendar-column" data-agent="calendar_assistant">
-                <div class="column-header">
-                    <div class="agent-icon">
-                        <i class="fas fa-calendar-check"></i>
-                    </div>
-                    <div class="agent-info">
-                        <h3>Calendar Agent</h3>
-                        <p>Scheduling meetings</p>
-                    </div>
-                    <div class="agent-status" id="calendar-status">
-                        <div class="status-indicator idle"></div>
-                    </div>
-                </div>
-                
-                <div class="column-content" id="calendar-content">
-                    {% for business in businesses %}
-                        {% if business.status == 'meeting_scheduled' %}
-                        <div class="business-card compact meeting-card" data-business-id="{{ business.id }}">
-                            <div class="business-header">
-                                <div class="business-title">
-                                    <i class="fas fa-handshake meeting-icon"></i>
-                                    <h4>{{ business.name }}</h4>
-                                </div>
-                                <span class="status-badge status-meeting">Meeting</span>
-                            </div>
-                            <div class="business-details">
-                                <div class="detail">
-                                    <i class="fas fa-map-marker-alt"></i>
-                                    <span>{{ business.city }}</span>
-                                </div>
-                                <div class="contact-row">
-                                    {% if business.phone %}
-                                    <div class="contact-item">
-                                        <i class="fas fa-phone"></i>
-                                        <span>{{ business.phone }}</span>
-                                    </div>
-                                    {% endif %}
-                                    {% if business.email %}
-                                    <div class="contact-item">
-                                        <i class="fas fa-envelope"></i>
-                                        <span>{{ business.email[:20] }}{% if business.email|length > 20 %}...{% endif %}</span>
-                                    </div>
-                                    {% endif %}
-                                </div>
-                                {% if business.notes %}
-                                <div class="compact-notes">
-                                    <i class="fas fa-calendar-check"></i>
-                                    <span>{{ business.notes[-1][:50] }}{% if business.notes[-1]|length > 50 %}...{% endif %}</span>
-                                </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-            </div>
         </div>
 
         <!-- Activity Log -->
@@ -340,14 +289,55 @@
                 </div>
             </div>
             <div class="modal-actions">
-                <button class="btn-secondary" onclick="closeSdrDialog()">
-                    <i class="fas fa-times"></i>
-                    Cancel
-                </button>
                 <button class="btn-primary" id="confirm-sdr-btn" onclick="confirmSendToSdr()">
                     <i class="fas fa-paper-plane"></i>
                     Send to SDR
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Human Input Dialog -->
+    <div class="modal-overlay hidden" id="human-input-dialog-overlay" onclick="closeHumanInputDialog()">
+        <div class="modal-dialog human-input-dialog" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3><i class="fas fa-globe"></i> SDR Agent Requesting Website Creation</h3>
+                <button class="modal-close" onclick="closeHumanInputDialog()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="human-input-message">
+                    <p><strong>SDR agent requesting website creation</strong></p>
+                    <div class="prompt-container">
+                        <div class="prompt-header">
+                            <span class="prompt-label">Website creation prompt:</span>
+                            <button class="copy-prompt-btn" onclick="copyPromptToClipboard()" title="Copy prompt to clipboard">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        <textarea id="human-input-prompt" readonly class="prompt-display"></textarea>
+                    </div>
+                    <div class="redirect-section">
+                        <button class="btn-redirect" onclick="openFirebaseStudio()">
+                            <i class="fas fa-external-link-alt"></i>
+                            Firebase Studio
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="closeHumanInputDialog()">
+                    <i class="fas fa-times"></i>
+                    Cancel
+                </button>
+                <div class="url-input-container">
+                    <input type="url" id="website-url-input" placeholder="Enter website URL here..." class="url-input">
+                    <button class="btn-primary" id="submit-website-url-btn" onclick="submitWebsiteUrl()">
+                        <i class="fas fa-check"></i>
+                        Submit URL
+                    </button>
+                </div>
             </div>
         </div>
     </div>
