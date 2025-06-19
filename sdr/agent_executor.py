@@ -153,8 +153,10 @@ class SDRAgentExecutor(AgentExecutor):
         # Initialize optional state variables to avoid missing context errors in subsequent agents
         # e.g., offer_file_path and website_preview_link used by the email agent templates
         try:
-            session.state.setdefault("offer_file_path", "")
-            session.state.setdefault("website_preview_link", "")
+            if "offer_file_path" not in session.state:
+                session.state["offer_file_path"] = ""
+            if "website_preview_link" not in session.state:
+                session.state["website_preview_link"] = ""
         except Exception:
             logger.warning(f"Task {context.task_id}: Unable to set default state keys for offer_file_path or website_preview_link")
 

@@ -75,7 +75,7 @@ EMAIL_CRAFTER_PROMPT = """
    "to": "john.doe@example.com",
    "subject": "Follow-up on Our Recent Call - Proposal for {business_data['company_name']}",
    "body": "Reach text of the email goes here",
-   "attachment": "{offer_file_path}"  # Optional, if an offer file is created
+   "attachment": "{offer_file_path?}"  # Optional, if an offer file is created
    }
    ```
 
@@ -83,7 +83,7 @@ EMAIL_CRAFTER_PROMPT = """
    Business Data: {business_data}
    Proposal: {refined_requirements}
    Preview Website: {website_preview_link}
-   Attachment: {offer_file_path}
+   Attachment: {offer_file_path?}
 
    Write the email content and save it under the 'crafted_email' output key.
    """
@@ -94,7 +94,7 @@ EMAIL_SENDER_AGENT_PROMPT = """
    You are an Email Agent responsible for crafting and sending personalized business outreach emails with commercial offers.
    
    Email data: {crafted_email}
-   Offer file path: {offer_file_path}
+   Offer file path: {offer_file_path?}
 
    ### INSTRUCTIONS
    1. Read the email content from the state['crafted_email'] key.
