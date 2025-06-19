@@ -79,7 +79,6 @@ class AgentType(str, Enum):
     LEAD_FINDER = "lead_finder"
     SDR = "sdr"
     LEAD_MANAGER = "lead_manager"
-    CALENDAR_ASSISTANT = "calendar_assistant"
 
 # Data Models
 class Business(BaseModel):
@@ -105,6 +104,16 @@ class AgentUpdate(BaseModel):
 class LeadFinderRequest(BaseModel):
     city: str = Field(..., min_length=1, max_length=100, description="Target city for lead finding")
 
+class HumanInputRequest(BaseModel):
+    request_id: str
+    prompt: str
+    type: str
+    timestamp: str
+
+class HumanInputResponse(BaseModel):
+    request_id: str
+    response: str
+
 # Global application state
 app_state = {
     "is_running": False,
@@ -113,6 +122,7 @@ app_state = {
     "agent_updates": [],  # List[AgentUpdate]
     "websocket_connections": set(),  # Set[WebSocket]
     "session_id": None,
+    "human_input_requests": {},  # dict[str, HumanInputRequest]
 }
 
 class ConnectionManager:
@@ -483,8 +493,8 @@ async def call_sdr_agent_simple(business_data: dict[str, Any], session_id: str) 
         async with httpx.AsyncClient(timeout=300.0) as client:
             # Try different endpoints that might exist
             endpoints_to_try = [
-                f"{sdr_url}/engage_lead",
-                f"{sdr_url}/process",
+                # f"{sdr_url}/engage_lead",
+                # f"{sdr_url}/process",
                 f"{sdr_url}/",
             ]
             
@@ -833,6 +843,92 @@ async def reset_state():
     
     return RedirectResponse("/", status_code=303)
 
+@app.post("/api/human-input")
+async def receive_human_input_request(request: HumanInputRequest):
+    """Receive a human input request from agents."""
+    logger.info(f"Received human input request: {request.request_id} - {request.type}")
+    
+    # Store the request
+    app_state["human_input_requests"][request.request_id] = request
+    
+    # Send notification to all connected WebSocket clients
+    await manager.send_update({
+        "type": "human_input_request",
+        "request_id": request.request_id,
+        "prompt": request.prompt,
+        "input_type": request.type,
+        "timestamp": request.timestamp,
+    })
+    
+    return {
+        "status": "received",
+        "request_id": request.request_id,
+        "message": "Human input request received. Please check the UI for the modal dialog.",
+        "timestamp": datetime.now().isoformat()
+    }
+
+@app.get("/api/human-input")
+async def get_pending_human_input_requests():
+    """Get all pending human input requests."""
+    return {
+        "requests": [req.dict() for req in app_state["human_input_requests"].values()],
+        "count": len(app_state["human_input_requests"])
+    }
+
+@app.post("/api/human-input/{request_id}")
+async def submit_human_input_response(request_id: str, response: HumanInputResponse):
+    """Submit a response to a human input request."""
+    if request_id not in app_state["human_input_requests"]:
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Request not found"}
+        )
+    
+    # Get the request first (but don't remove it yet)
+    original_request = app_state["human_input_requests"].get(request_id)
+    
+    logger.info(f"Human input response submitted for {request_id}: {response.response}")
+    
+    # Try to notify the human creation tool via HTTP callback to SDR agent
+    success = False
+    agent_url = os.environ.get("SDR_SERVICE_URL", config.DEFAULT_SDR_URL).rstrip("/")
+    callback_url = f"{agent_url}/api/human-input/{request_id}"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            agent_resp = await client.post(
+                callback_url,
+                json={"url": response.response},
+                headers={"Content-Type": "application/json"}
+            )
+            if agent_resp.status_code == 200:
+                logger.info(f"Successfully notified human creation tool on agent for request {request_id}")
+                success = True
+            else:
+                logger.warning(f"Agent returned status {agent_resp.status_code} for request {request_id}: {agent_resp.text}")
+    except httpx.ConnectError:
+        logger.warning(f"Connection to SDR agent failed for request {request_id}")
+    except Exception as e:
+        logger.error(f"Error notifying SDR agent for request {request_id}: {e}")
+    
+    # Only remove the request from UI state AFTER successful processing
+    if success:
+        app_state["human_input_requests"].pop(request_id, None)
+    
+    # Send WebSocket notification that response was submitted
+    await manager.send_update({
+        "type": "human_input_response_submitted",
+        "request_id": request_id,
+        "response": response.response,
+        "timestamp": datetime.now().isoformat()
+    })
+    
+    return {
+        "status": "success",
+        "request_id": request_id,
+        "message": "Response submitted successfully",
+        "timestamp": datetime.now().isoformat()
+    }
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring and load balancers."""
@@ -855,7 +951,6 @@ if __name__ == "__main__":
     logger.info(f"  Lead Finder: python -m lead_finder --port {config.DEFAULT_LEAD_FINDER_PORT}")
     logger.info(f"  SDR: python -m sdr --port {config.DEFAULT_SDR_PORT}")
     logger.info(f"  Lead Manager: python -m lead_manager --port {config.DEFAULT_LEAD_MANAGER_PORT}")
-    logger.info(f"  Calendar Assistant: python -m calendar_assistant --port {config.DEFAULT_CALENDAR_ASSISTANT_PORT}")
     logger.info(f"--- Access UI at http://0.0.0.0:{config.DEFAULT_UI_CLIENT_PORT} ---")
     
     uvicorn.run(

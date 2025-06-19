@@ -86,7 +86,6 @@ def main():
     logger.info(f"  Lead Finder:        {os.environ.get('LEAD_FINDER_SERVICE_URL', config.DEFAULT_LEAD_FINDER_URL)}")
     logger.info(f"  SDR Agent:          {os.environ.get('SDR_SERVICE_URL', config.DEFAULT_SDR_URL)}")
     logger.info(f"  Lead Manager:       {os.environ.get('LEAD_MANAGER_SERVICE_URL', config.DEFAULT_LEAD_MANAGER_URL)}")
-    logger.info(f"  Calendar Assistant: {os.environ.get('CALENDAR_ASSISTANT_SERVICE_URL', config.DEFAULT_CALENDAR_ASSISTANT_URL)}")
     logger.info("")
     logger.info("Environment Variables:")
     logger.info(f"  GOOGLE_API_KEY: {'✓ Set' if google_api_key else '✗ Not set'}")

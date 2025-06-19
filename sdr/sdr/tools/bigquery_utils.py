@@ -26,17 +26,15 @@ def _write_json_file(filepath: Path, data: Dict[str, Any]) -> None:
 async def sdr_bigquery_upload(
     business_data: Dict[str, Any],
     proposal: str,
-    call_result: Dict[str, Any],
-    research_result: str
-) -> Dict[str, Any]:
+    call_category: Dict[str, Any],
+) -> dict[str, Any]:
     """
     BigQuery upload tool for SDR results.
     
     Args:
         business_data: The original business lead data
-        proposal: The generated proposal
-        call_result: The phone call results
-        research_result: The research findings
+        proposal: The generated proposal that was sent to the business owner to discuss on the phone call
+        call_category: The resulted call category from the conversation classifier agent
         
     Returns:
         A dictionary containing upload status
@@ -51,12 +49,8 @@ async def sdr_bigquery_upload(
     sdr_record = {
         "timestamp": datetime.now().isoformat(),
         "business_data": business_data,
-        "research_result": research_result,
         "proposal": proposal,
-        "call_result": call_result,
-        "status": call_result.get("status", "unknown"),
-        "call_category": call_result.get("category", "unknown"),
-        "agreed_to_proposal": call_result.get("category") == "agreed_to_email"
+        "call_category": call_category,
     }
     
     try:
