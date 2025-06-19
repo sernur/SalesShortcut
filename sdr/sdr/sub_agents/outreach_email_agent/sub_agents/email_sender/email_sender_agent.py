@@ -1,32 +1,20 @@
 """
-Email Agent for crafting and sending outreach emails.
+Email Agent for crafting and sending outreach emails using service account.
+No manual authentication required.
 """
-import os # Import os to access environment variables
+import os
 
 from google.adk.agents.llm_agent import LlmAgent
-from google.adk.tools.google_api_tool import GmailToolset # <-- Import GmailToolset
 
-from sdr.sdr.config import MODEL, GOOGLE_CLOUD_CLIENT_ID, GOOGLE_CLOUD_CLIENT_SECRET
+from sdr.sdr.config import MODEL
 from ...outreach_email_prompt import EMAIL_SENDER_AGENT_PROMPT
-from ...tools.create_rfc88_message import create_rfc822_message
-
-
-# based on the client_id and client_secret.
-gmail_toolset = GmailToolset(
-    client_id=GOOGLE_CLOUD_CLIENT_ID,
-    client_secret=GOOGLE_CLOUD_CLIENT_SECRET
-)
-
-gmail_toolset.configure_auth(
-    client_id=GOOGLE_CLOUD_CLIENT_ID,
-    client_secret=GOOGLE_CLOUD_CLIENT_SECRET
-)
+from ...tools.gmail_service_account_tool import gmail_send_tool, send_crafted_email
 
 email_sender_agent = LlmAgent(
     name="EmailSenderAgent",
-    description="Agent that crafts and sends personalized business outreach emails with commercial offers",
+    description="Agent that sends personalized business outreach emails with commercial offers using service account (no manual auth)",
     model=MODEL,
     instruction=EMAIL_SENDER_AGENT_PROMPT,
-    tools=[create_rfc822_message, gmail_toolset],
+    tools=[gmail_send_tool, send_crafted_email],
     output_key="email_sent_result"
 )

@@ -7,7 +7,7 @@ import os # Import os for path handling
 from typing import Optional, List
 
 
-def create_rfc822_message(to_email: str, subject: str, body: str, file_paths: Optional[List[str]] = None):
+def create_rfc822_message(to_email: str, subject: str, body: str, from_email: str = None, file_paths: Optional[List[str]] = None):
     """
     Creates an RFC822 formatted message string with optional attachments that Gmail API can use.
     
@@ -15,6 +15,7 @@ def create_rfc822_message(to_email: str, subject: str, body: str, file_paths: Op
         to_email: Recipient email address
         subject: Email subject
         body: Email body text
+        from_email: Sender email (optional, will use authenticated user's email if not provided)
         file_paths: A list of file paths to attach (e.g., ['path/to/file1.pdf', 'path/to/image.png'])
     
     Returns:
@@ -29,42 +30,45 @@ def create_rfc822_message(to_email: str, subject: str, body: str, file_paths: Op
 
     msg['To'] = to_email
     msg['Subject'] = subject
-
+    
+    # Add From header if provided
+    if from_email:
+        msg['From'] = from_email
 
     # Attach the email body if it's a multipart message
-    # if file_paths:
-    #     msg.attach(MIMEText(body, 'plain'))
+    if file_paths:
+        msg.attach(MIMEText(body, 'plain'))
 
-    #     for file_path in file_paths:
-    #         try:
-    #             # Guess the MIME type of the file
-    #             import mimetypes
-    #             content_type, encoding = mimetypes.guess_type(file_path)
+        for file_path in file_paths:
+            try:
+                # Guess the MIME type of the file
+                import mimetypes
+                content_type, encoding = mimetypes.guess_type(file_path)
                 
-    #             if content_type is None or encoding is not None:
-    #                 content_type = 'application/octet-stream' # Default if type can't be guessed
+                if content_type is None or encoding is not None:
+                    content_type = 'application/octet-stream' # Default if type can't be guessed
                 
-    #             main_type, sub_type = content_type.split('/', 1)
+                main_type, sub_type = content_type.split('/', 1)
 
-    #             with open(file_path, 'rb') as f:
-    #                 file_data = f.read()
+                with open(file_path, 'rb') as f:
+                    file_data = f.read()
 
-    #             if main_type == 'text':
-    #                 part = MIMEText(file_data.decode('utf-8'), _subtype=sub_type)
-    #             else:
-    #                 part = MIMEBase(main_type, sub_type)
-    #                 part.set_payload(file_data)
-    #                 encoders.encode_base64(part) # Encode content to base64
+                if main_type == 'text':
+                    part = MIMEText(file_data.decode('utf-8'), _subtype=sub_type)
+                else:
+                    part = MIMEBase(main_type, sub_type)
+                    part.set_payload(file_data)
+                    encoders.encode_base64(part) # Encode content to base64
 
-    #             # Add header with the filename
-    #             filename = os.path.basename(file_path)
-    #             part.add_header('Content-Disposition', 'attachment', filename=filename)
-    #             msg.attach(part)
+                # Add header with the filename
+                filename = os.path.basename(file_path)
+                part.add_header('Content-Disposition', 'attachment', filename=filename)
+                msg.attach(part)
 
-    #         except Exception as e:
-    #             print(f"Error attaching file {file_path}: {e}")
-    #             # You might want to handle this error more gracefully, e.g., raise an exception
-    #             continue # Continue to the next file if one fails
+            except Exception as e:
+                print(f"Error attaching file {file_path}: {e}")
+                # You might want to handle this error more gracefully, e.g., raise an exception
+                continue # Continue to the next file if one fails
     
     # Convert to RFC822 format and encode
     rfc822_message = msg.as_string()

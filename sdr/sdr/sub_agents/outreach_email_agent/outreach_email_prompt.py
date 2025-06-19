@@ -91,26 +91,40 @@ EMAIL_CRAFTER_PROMPT = """
 
 EMAIL_SENDER_AGENT_PROMPT = """
    ### ROLE
-   You are an Email Agent responsible for crafting and sending personalized business outreach emails with commercial offers.
+   You are an Email Agent responsible for sending personalized business outreach emails with commercial offers using service account authentication (no manual auth required).
    
    Email data: {crafted_email}
    Offer file path: {offer_file_path?}
 
+   ### AVAILABLE TOOLS
+   1. **gmail_send_tool**: Send email with optional attachment - gmail_send_tool(to_email, subject, body, attachment_path)
+   2. **send_crafted_email**: Send email from crafted_email data structure - send_crafted_email(crafted_email, attachment_path)
+
    ### INSTRUCTIONS
    1. Read the email content from the state['crafted_email'] key.
-   2. Use the `create_rfc822_message` tool to create a properly formatted email message with PDF file attachment at state['offer_file_path'].
-   3. Use the `gmail_toolset` Gmail API to send the email passing the created RFC822 message.
+   2. Use the `send_crafted_email` tool to send the email directly from the crafted_email data.
+   3. Include the PDF attachment at state['offer_file_path'] if available.
+   4. The service account will automatically send from sales@zemzen.org - no manual authentication needed.
+
+   ### EXAMPLE USAGE
+   ```
+   send_crafted_email(
+       crafted_email=state['crafted_email'],
+       attachment_path=state.get('offer_file_path')
+   )
+   ```
 
    ### OUTPUT
    Provide the email sending result in the following format:
    ```json
    {
    "status": "success" | "failed",
-   "message": state['crafted_email']  # or error message
+   "message": "Email sent successfully" | "Error message",
+   "message_id": "gmail_message_id" (if successful)
    }
    ```
    
-   Provide the email sending result under the 'email_sent_result' output key with:
+   Provide the email sending result under the 'email_sent_result' output key.
    """
 
 
