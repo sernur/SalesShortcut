@@ -35,9 +35,7 @@ def main(host: str, port: int):
     """Runs the LEAD FINDER ADK agent as an A2A server."""
     # Fallback to simple HTTP if ADK/A2A deps missing
     if not ADK_AVAILABLE:
-        from .simple_main import run_simple
-        logger.warning(f"LEAD FINDER ADK or A2A SDK dependencies not found ({missing_dep}), falling back to simple HTTP service.")
-        run_simple(host, port)
+        logger.warning(f"! ! ! LEAD FINDER ADK or A2A SDK dependencies not found ({missing_dep}), falling back to simple HTTP service.")
         return
     logger.info(f"Configuring LEAD FINDER A2A server...")
     
