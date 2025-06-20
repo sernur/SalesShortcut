@@ -7,7 +7,7 @@ PROMPT_PREPARE_PROMPT = """
 
    ### INSTRUCTION
    1. Read the website requirements and preferences from the state['refined_requirements'] key.
-   2. Generate a detailed prompt that includes:
+   2. Generate a simple prompt that includes:
       - The website map
       - Color and marketing preferences
       - Design preferences (colors, layout, etc.)
@@ -16,7 +16,8 @@ PROMPT_PREPARE_PROMPT = """
    4. Make sure that the prompt is easy and simple UI static website example to show the user how the website will look like.
    5. At the end of the prompt, include a note that the website should be created as beautiful demo prototype.
    6. Main purpose of the website is not implement the functionality, but to show the user how the website will look like.
-   7. Save the generated prompt in the state['website_creation_prompt'] key.
+   7. The main goal is to create a prompt that would be both easy to implement for AI website builder and feel personalized for the user based on the refined requirements.
+   8. Save the generated prompt in the state['website_creation_prompt'] key.
 
    ### OUTPUT
    Provide the generated prompt in a single string in the state['website_creation_prompt'] key.
@@ -39,15 +40,16 @@ OFFER_FILE_CREATOR_PROMPT = """
       - Use `replace_content_section_tool` to update specific sections
       - Use `add_content_section_tool` to add new sections
    3. After any content edits, use `create_offer_file` function to generate the final PDF.
-   4. Save the output file path in the state['offer_file_path'] key.
-   
+   4. You should save the result of `create_offer_file` in the state['offer_file_path'] key.
+   5. Save the output file path in the 'offer_file_path' key.
+
    ### CONTENT EDITING CAPABILITIES
    - You can now edit, modify, and enhance proposal content before creating the PDF
    - You can add new sections, replace existing ones, or make general content improvements
    - Always ensure the final content is professional and well-structured
    - Maintain the markdown format for proper PDF generation
    
-   Provide the file path in the state['offer_file_path'] key.
+   Provide the file path in the 'offer_file_path' key.
    """
    
 EMAIL_CRAFTER_PROMPT = """
@@ -57,11 +59,12 @@ EMAIL_CRAFTER_PROMPT = """
    ### INSTRUCTIONS
    1. Read the provided business data, proposal details, and website preview link at state['business_data'], state['refined_requirements'] and state['website_preview_link'].
    2. Read the state['call_result'] key to understand the destination of the email and state['offer_file_path'] for the offer file path.
-   2. Use this information to craft a compelling email that addresses the recipient's needs.
-   3. Do not just repeat the proposal content, but rather summarize and highlight key points.
-   4. Ensure the email is professional, friendly, and engaging.
-   5. Include a clear call-to-action and next steps of arranging a follow-up meeting.
-   6. Construct the email structure as follows:
+   3. Use this information to craft a compelling email that addresses the recipient's needs.
+   4. Do not just repeat the proposal content, but rather summarize and highlight key points.
+   5. Ensure the email is professional, friendly, and engaging.
+   6. Include a clear call-to-action and next steps of arranging a follow-up meeting.
+   7. For the attachment field: if offer_file_path is provided and not empty, include it; otherwise use an empty string.
+   8. Construct the email structure as follows:
 
    ### EMAIL STRUCTURE
    `to`: take from state['call_result'].
@@ -75,7 +78,7 @@ EMAIL_CRAFTER_PROMPT = """
    "to": "john.doe@example.com",
    "subject": "Follow-up on Our Recent Call - Proposal for {business_data['company_name']}",
    "body": "Reach text of the email goes here",
-   "attachment": "{offer_file_path?}"  # Optional, if an offer file is created
+   "attachment": "path_to_attachment_or_empty_string"  # Include offer_file_path if available, otherwise empty string
    }
    ```
 
@@ -83,7 +86,7 @@ EMAIL_CRAFTER_PROMPT = """
    Business Data: {business_data}
    Proposal: {refined_requirements}
    Preview Website: {website_preview_link}
-   Attachment: {offer_file_path?}
+   Attachment Path (if available): {offer_file_path}
 
    Write the email content and save it under the 'crafted_email' output key.
    """
@@ -91,26 +94,41 @@ EMAIL_CRAFTER_PROMPT = """
 
 EMAIL_SENDER_AGENT_PROMPT = """
    ### ROLE
-   You are an Email Agent responsible for crafting and sending personalized business outreach emails with commercial offers.
+   You are an Email Agent responsible for sending personalized business outreach emails with commercial offers using service account authentication (no manual auth required).
    
    Email data: {crafted_email}
-   Offer file path: {offer_file_path?}
+   Offer file path: {offer_file_path}
+
+   ### AVAILABLE TOOLS
+   1. **send_email**: Send email with optional attachment - send_email(to_email, subject, body, attachment_path)
 
    ### INSTRUCTIONS
-   1. Read the email content from the state['crafted_email'] key.
-   2. Use the `create_rfc822_message` tool to create a properly formatted email message with PDF file attachment at state['offer_file_path'].
-   3. Use the `gmail_toolset` Gmail API to send the email passing the created RFC822 message.
+   1. Read the email content from the state['crafted_email'] key and attachment path from state['offer_file_path'].
+   2. Use the `send_email` tool to send the email directly from the crafted_email data.
+   3. Include the PDF attachment at state['offer_file_path'] if available.
+   4. The service account will automatically send from sales@zemzen.org - no manual authentication needed.
+
+   ### EXAMPLE USAGE
+   ```
+   send_email(
+       to_email=state['crafted_email']['to'],
+       subject=state['crafted_email']['subject'],
+       body=state['crafted_email']['body'],
+       attachment_path=state.get('offer_file_path')
+   )
+   ```
 
    ### OUTPUT
    Provide the email sending result in the following format:
    ```json
    {
    "status": "success" | "failed",
-   "message": state['crafted_email']  # or error message
+   "message": "Email sent successfully" | "Error message",
+   "message_id": "gmail_message_id" (if successful)
    }
    ```
    
-   Provide the email sending result under the 'email_sent_result' output key with:
+   Provide the email sending result under the 'email_sent_result' output key.
    """
 
 

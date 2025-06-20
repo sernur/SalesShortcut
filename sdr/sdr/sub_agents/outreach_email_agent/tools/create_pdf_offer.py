@@ -394,18 +394,16 @@ class MarkdownToPDFConverter:
         return self.story
 
 def create_sales_proposal_pdf(markdown_offer: str) -> str:
-    """Creates a PDF sales proposal file from Markdown content using ReportLab.
+    """Creates a PDF sales proposal file from Markdown offer.
 
     This function takes Markdown-formatted content, converts it into a styled
-    PDF document, and saves it to the current working directory. The PDF
-    includes custom branding, page layouts, and formatting for various
-    Markdown elements like headings, lists, tables, and code blocks.
+    PDF document, and saves it to the current working directory. Returnting the 'offer_file_path' key.
 
     Args:
         markdown_offer (str): The Markdown content representing the sales proposal.
 
     Returns:
-        str: The absolute file path of the created PDF proposal.
+        str: The absolute file path of the created PDF proposal. Save this as 'offer_file_path' in state.
 
     Raises:
         Exception: If an error occurs during PDF generation.
@@ -415,7 +413,7 @@ def create_sales_proposal_pdf(markdown_offer: str) -> str:
     
     
     current_dir = os.path.dirname(os.path.abspath(__file__)) if '__file__' in globals() else os.getcwd()
-    output_pdf_file = os.path.join(current_dir, "SalesShortcut_Proposal.pdf")
+    output_pdf_file = os.path.join(current_dir, "ZemZenProposal.pdf")
 
     try:
         doc = SimpleDocTemplate(

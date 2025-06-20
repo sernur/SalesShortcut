@@ -34,9 +34,21 @@ TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
 TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER", "")
 
 
-# Google Cloud Client ID for OAuth
+# Google Cloud Client ID for OAuth (Legacy - for backward compatibility)
 GOOGLE_CLOUD_CLIENT_ID = os.getenv("GOOGLE_CLOUD_CLIENT_ID", "")
 GOOGLE_CLOUD_CLIENT_SECRET = os.getenv("GOOGLE_CLOUD_CLIENT_SECRET", "")
+
+# Gmail Service Account Configuration (New - No manual auth required)
+# For local development
+SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE", ".secrets/sales-automation-service.json")
+# For cloud deployment, set GOOGLE_APPLICATION_CREDENTIALS environment variable
+# or use Cloud Run service account (no file needed)
+SALES_EMAIL = os.getenv("SALES_EMAIL", "sales@zemzen.org")  # Email to send from
+GMAIL_SCOPES = [
+    'https://www.googleapis.com/auth/gmail.send',
+    'https://www.googleapis.com/auth/gmail.readonly',
+    'https://www.googleapis.com/auth/gmail.modify'
+]
 
 # Test mode configuration
 TEST_MODE = os.getenv("TEST", "false").lower() == "true"

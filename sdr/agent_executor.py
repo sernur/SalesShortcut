@@ -174,8 +174,38 @@ class SDRAgentExecutor(AgentExecutor):
                 session_id=session_id_for_adk,
                 new_message=adk_content,
             ):
+                # Collect and log the raw event
                 all_events.append(event)
                 logger.info(f"Task {context.task_id}: ADK Event: {event}")
+                # Stream intermediate agent messages back to the client
+                # so that human-in-the-loop prompts (e.g., website creation) are surfaced
+                if event.content and event.content.parts:
+                    for part in event.content.parts:
+                        # Text parts: relay to client as working status updates
+                        if hasattr(part, "text") and part.text:
+                            try:
+                                from a2a.types import TextPart
+                                msg = task_updater.new_agent_message(
+                                    parts=[Part(root=TextPart(text=part.text))]
+                                )
+                                task_updater.update_status(TaskState.working, message=msg)
+                            except ImportError:
+                                # Fallback: send as data part
+                                msg = task_updater.new_agent_message(
+                                    parts=[Part(root=DataPart(data={"text": part.text}))]
+                                )
+                                task_updater.update_status(TaskState.working, message=msg)
+                        # Function call events: relay tool invocation details
+                        if hasattr(part, 'function_call') and part.function_call:
+                            fc = part.function_call
+                            # Send the tool name and args for transparency
+                            msg = task_updater.new_agent_message(
+                                parts=[Part(root=DataPart(data={
+                                    "tool_call": fc.name,
+                                    "args": fc.args
+                                }))]
+                            )
+                            task_updater.update_status(TaskState.working, message=msg)
                 
                 # Capture function call results (like phone_call)
                 if event.content and event.content.parts:
