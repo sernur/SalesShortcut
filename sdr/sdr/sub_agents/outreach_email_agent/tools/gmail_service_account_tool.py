@@ -39,12 +39,12 @@ def create_service_account_credentials():
         # Try to use environment variable for cloud deployment first
         credentials = None
         
-        # Check if GOOGLE_APPLICATION_CREDENTIALS is set (cloud deployment)
-        if os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
-            print("📁 Using GOOGLE_APPLICATION_CREDENTIALS environment variable...")
-            logger.info(f"Using GOOGLE_APPLICATION_CREDENTIALS: {os.getenv('GOOGLE_APPLICATION_CREDENTIALS')}")
+        # Check if SERVICE_ACCOUNT_FILE is set (cloud deployment)
+        if os.getenv('SERVICE_ACCOUNT_FILE'):
+            print("📁 Using SERVICE_ACCOUNT_FILE environment variable...")
+            logger.info(f"Using SERVICE_ACCOUNT_FILE: {os.getenv('SERVICE_ACCOUNT_FILE')}")
             credentials = service_account.Credentials.from_service_account_file(
-                os.getenv('GOOGLE_APPLICATION_CREDENTIALS'), scopes=GMAIL_SCOPES
+                os.getenv('SERVICE_ACCOUNT_FILE'), scopes=GMAIL_SCOPES
             )
         # Check if service account file exists locally
         elif os.path.exists(SERVICE_ACCOUNT_FILE):
@@ -64,7 +64,7 @@ def create_service_account_credentials():
                 logger.error(f"Default credentials failed: {default_error}")
                 raise FileNotFoundError(
                     f"No service account credentials found. Tried:\n"
-                    f"1. GOOGLE_APPLICATION_CREDENTIALS env var\n"
+                    f"1. SERVICE_ACCOUNT_FILE env var\n"
                     f"2. Local file: {SERVICE_ACCOUNT_FILE}\n"
                     f"3. Default cloud credentials\n"
                     f"Default credentials error: {default_error}"
