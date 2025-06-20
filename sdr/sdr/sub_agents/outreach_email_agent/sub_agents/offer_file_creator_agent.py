@@ -16,10 +16,10 @@ offer_file_creator_agent = LlmAgent(
     model=MODEL,
     instruction=OFFER_FILE_CREATOR_PROMPT,
     tools=[
-        create_offer_file,
         edit_proposal_content_tool,
         replace_content_section_tool,
-        add_content_section_tool
+        add_content_section_tool,
+        create_offer_file,
     ],
     output_key="offer_file_path"
 )

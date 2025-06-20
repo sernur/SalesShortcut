@@ -35,6 +35,7 @@ class HumanRequest:
 class HumanInteractionManager:
     _instance = None
     _pending_requests: Dict[str, HumanRequest] = {}
+    _active_sessions: set = set()  # Track active sessions to prevent duplicates
     
     def __new__(cls):
         if cls._instance is None:
@@ -62,6 +63,15 @@ class HumanInteractionManager:
     def cleanup_request(self, request_id: str):
         if request_id in self._pending_requests:
             del self._pending_requests[request_id]
+    
+    def is_session_active(self, session_id: str) -> bool:
+        return session_id in self._active_sessions
+    
+    def mark_session_active(self, session_id: str):
+        self._active_sessions.add(session_id)
+    
+    def mark_session_inactive(self, session_id: str):
+        self._active_sessions.discard(session_id)
 
 async def send_ui_notification(request_id: str, prompt: str, ui_endpoint: str = None, max_retries: int = 3) -> bool:
     """Send notification to UI via REST API with retry logic"""
@@ -157,12 +167,29 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
     if existing_url:
         logger.info(f"Skipping human creation: existing website_preview_link found: {existing_url}")
         return existing_url
+    
+    manager = HumanInteractionManager()
+    
+    # Create a unique session ID based on the tool context or prompt hash
+    session_id = f"website_creation_{hash(website_creation_prompt) % 1000000}"
+    
+    # Check if this session is already active to prevent duplicate requests
+    if manager.is_session_active(session_id):
+        logger.info(f"Session {session_id} already active, skipping duplicate human creation request")
+        # Wait a bit and check for existing results
+        await asyncio.sleep(2)
+        updated_url = tool_context.state.get("website_preview_link", "") if tool_context else ""
+        if updated_url:
+            return updated_url
+        return "Duplicate request detected. Please wait for the existing request to complete."
+    
+    # Mark session as active
+    manager.mark_session_active(session_id)
+    
     logger.info("🤖 AGENT: Requesting human website creation")
     logger.info(f"📋 Prompt: {website_creation_prompt[:100]}...")
     logger.debug(f"Full prompt: {website_creation_prompt}")
-    
-    
-    manager = HumanInteractionManager()
+    logger.info(f"Session ID: {session_id}")
     
     # Create the request
     request_id = manager.create_request(website_creation_prompt)
@@ -195,6 +222,17 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
             # Add a small delay before cleanup to allow UI to complete its callback
             await asyncio.sleep(2)
             manager.cleanup_request(request_id)
+            manager.mark_session_inactive(session_id)
+            
+            # Clear the website_creation_prompt from state to prevent re-execution
+            if tool_context and hasattr(tool_context, 'state') and 'website_creation_prompt' in tool_context.state:
+                try:
+                    # Try to set to None instead of deleting
+                    tool_context.state['website_creation_prompt'] = None
+                    logger.info("Cleared website_creation_prompt from state to prevent looping")
+                except Exception as e:
+                    logger.warning(f"Could not clear website_creation_prompt from state: {e}")
+            
             return url_response
         else:
             logger.error("❌ NO RESPONSE: Request timed out or was cancelled")
@@ -203,11 +241,33 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
             
             # Cleanup
             manager.cleanup_request(request_id)
+            manager.mark_session_inactive(session_id)
+            
+            # Clear the website_creation_prompt from state to prevent re-execution
+            if tool_context and hasattr(tool_context, 'state') and 'website_creation_prompt' in tool_context.state:
+                try:
+                    # Try to set to None instead of deleting
+                    tool_context.state['website_creation_prompt'] = None
+                    logger.info("Cleared website_creation_prompt from state after timeout to prevent looping")
+                except Exception as e:
+                    logger.warning(f"Could not clear website_creation_prompt from state: {e}")
+            
             return f"Human input timeout. Request ID: {request_id}. You can still submit a response via API."
             
     except Exception as e:
         logger.error(f"Error during human interaction: {e}")
         manager.cleanup_request(request_id)
+        manager.mark_session_inactive(session_id)
+        
+        # Clear the website_creation_prompt from state to prevent re-execution
+        if tool_context and hasattr(tool_context, 'state') and 'website_creation_prompt' in tool_context.state:
+            try:
+                # Try to set to None instead of deleting
+                tool_context.state['website_creation_prompt'] = None
+                logger.info("Cleared website_creation_prompt from state after error to prevent looping")
+            except Exception as e:
+                logger.warning(f"Could not clear website_creation_prompt from state: {e}")
+        
         return f"Error: {str(e)}"
 
 # API endpoint functions for external access

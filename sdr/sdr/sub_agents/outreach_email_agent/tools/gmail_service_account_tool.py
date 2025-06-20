@@ -7,7 +7,8 @@ Based on working example with attachment support.
 import os
 import base64
 import mimetypes
-from typing import Optional, Dict, Any
+import logging
+from typing import Optional, Any
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
@@ -15,8 +16,12 @@ from email import encoders
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from google.adk.tools import FunctionTool
 
 from sdr.sdr.config import SERVICE_ACCOUNT_FILE, SALES_EMAIL, GMAIL_SCOPES
+
+# Setup logger for this module
+logger = logging.getLogger(__name__)
 
 
 def create_service_account_credentials():
@@ -29,6 +34,7 @@ def create_service_account_credentials():
     """
     try:
         print(f"🔑 Setting up service account authentication for {SALES_EMAIL}...")
+        logger.info(f"Setting up service account authentication for {SALES_EMAIL}")
         
         # Try to use environment variable for cloud deployment first
         credentials = None
@@ -36,12 +42,14 @@ def create_service_account_credentials():
         # Check if GOOGLE_APPLICATION_CREDENTIALS is set (cloud deployment)
         if os.getenv('GOOGLE_APPLICATION_CREDENTIALS'):
             print("📁 Using GOOGLE_APPLICATION_CREDENTIALS environment variable...")
+            logger.info(f"Using GOOGLE_APPLICATION_CREDENTIALS: {os.getenv('GOOGLE_APPLICATION_CREDENTIALS')}")
             credentials = service_account.Credentials.from_service_account_file(
                 os.getenv('GOOGLE_APPLICATION_CREDENTIALS'), scopes=GMAIL_SCOPES
             )
         # Check if service account file exists locally
         elif os.path.exists(SERVICE_ACCOUNT_FILE):
             print(f"📁 Using local service account file: {SERVICE_ACCOUNT_FILE}")
+            logger.info(f"Using local service account file: {SERVICE_ACCOUNT_FILE}")
             credentials = service_account.Credentials.from_service_account_file(
                 SERVICE_ACCOUNT_FILE, scopes=GMAIL_SCOPES
             )
@@ -49,9 +57,11 @@ def create_service_account_credentials():
             # Try default cloud credentials (for Cloud Run with service account attached)
             try:
                 print("☁️ Attempting to use default Cloud credentials...")
+                logger.info("Attempting to use default Cloud credentials")
                 from google.auth import default
                 credentials, _ = default(scopes=GMAIL_SCOPES)
             except Exception as default_error:
+                logger.error(f"Default credentials failed: {default_error}")
                 raise FileNotFoundError(
                     f"No service account credentials found. Tried:\n"
                     f"1. GOOGLE_APPLICATION_CREDENTIALS env var\n"
@@ -63,19 +73,23 @@ def create_service_account_credentials():
         # Create delegated credentials for the sales email
         if hasattr(credentials, 'with_subject'):
             delegated_credentials = credentials.with_subject(SALES_EMAIL)
+            logger.info(f"Created delegated credentials for {SALES_EMAIL}")
         else:
             # For some credential types, we might not need delegation
             delegated_credentials = credentials
+            logger.info("Using non-delegated credentials")
         
         print(f"✅ Service account authentication successful for {SALES_EMAIL}")
+        logger.info(f"Service account authentication successful for {SALES_EMAIL}")
         return delegated_credentials
         
     except Exception as e:
         print(f"❌ Service account setup failed: {e}")
+        logger.error(f"Service account setup failed: {e}", exc_info=True)
         raise
 
 
-def send_email_with_attachment(to_email: str, subject: str, body: str, attachment_path: Optional[str] = None) -> Dict[str, Any]:
+def send_email_with_attachment(to_email: str, subject: str, body: str, attachment_path: Optional[str] = None) -> dict[str, Any]:
     """
     Send email from sales account with optional attachment using service account.
     
@@ -86,26 +100,35 @@ def send_email_with_attachment(to_email: str, subject: str, body: str, attachmen
         attachment_path: Optional path to attachment file
         
     Returns:
-        Dict containing send result with status and message/error info
+        dict containing send result with status and message/error info
     """
     try:
         print(f"📧 Preparing to send email to {to_email}")
         print(f"   From: {SALES_EMAIL}")
         print(f"   Subject: {subject}")
+        logger.info(f"Preparing to send email from {SALES_EMAIL} to {to_email}")
+        logger.info(f"Subject: {subject}")
+        logger.info(f"Body length: {len(body)} characters")
+        
         if attachment_path:
             print(f"   Attachment: {attachment_path}")
+            logger.info(f"Attachment path: {attachment_path}")
         
         # Check if attachment exists
         if attachment_path and not os.path.exists(attachment_path):
             print(f"⚠️  Warning: Attachment file not found at {attachment_path}")
             print("   Sending email without attachment...")
+            logger.warning(f"Attachment file not found at {attachment_path}")
             attachment_path = None
         
         # Create credentials
+        logger.info("Creating service account credentials...")
         credentials = create_service_account_credentials()
         
         # Create Gmail service
+        logger.info("Building Gmail service...")
         service = build('gmail', 'v1', credentials=credentials)
+        logger.info("Gmail service created successfully")
         
         # Create message with or without attachment
         if attachment_path and os.path.exists(attachment_path):
@@ -145,8 +168,11 @@ def send_email_with_attachment(to_email: str, subject: str, body: str, attachmen
         
         # Send email
         print("📤 Sending email...")
+        logger.info("Encoding email message...")
         raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
+        logger.info(f"Raw message length: {len(raw_message)} characters")
         
+        logger.info("Calling Gmail API to send email...")
         result = service.users().messages().send(
             userId='me',
             body={'raw': raw_message}
@@ -158,8 +184,11 @@ def send_email_with_attachment(to_email: str, subject: str, body: str, attachmen
         print("✅ EMAIL SENT SUCCESSFULLY!")
         print(f"   Message ID: {message_id}")
         print(f"   Thread ID: {thread_id}")
+        logger.info(f"Email sent successfully! Message ID: {message_id}, Thread ID: {thread_id}")
+        
         if attachment_path and os.path.exists(attachment_path):
             print(f"   📎 Attachment: {os.path.basename(attachment_path)} included")
+            logger.info(f"Attachment included: {os.path.basename(attachment_path)}")
         print(f"   📬 Check {to_email} inbox!")
         
         return {
@@ -173,6 +202,7 @@ def send_email_with_attachment(to_email: str, subject: str, body: str, attachmen
     except HttpError as error:
         error_details = str(error)
         print(f"❌ Gmail API error: {error_details}")
+        logger.error(f"Gmail API error: {error_details}", exc_info=True)
         return {
             "status": "failed",
             "error": f"Gmail API error: {error_details}",
@@ -181,6 +211,7 @@ def send_email_with_attachment(to_email: str, subject: str, body: str, attachmen
         
     except Exception as e:
         print(f"❌ Email sending failed: {e}")
+        logger.error(f"Email sending failed: {e}", exc_info=True)
         return {
             "status": "failed", 
             "error": str(e),
@@ -188,50 +219,4 @@ def send_email_with_attachment(to_email: str, subject: str, body: str, attachmen
         }
 
 
-# Tool function for LLM Agent usage
-def gmail_send_tool(to_email: str, subject: str, body: str, attachment_path: Optional[str] = None) -> str:
-    """
-    Tool function for sending emails via Gmail API using service account.
-    Designed to be used as a tool by LLM agents.
-    
-    Args:
-        to_email: Recipient email address
-        subject: Email subject  
-        body: Email body text
-        attachment_path: Optional path to attachment file
-        
-    Returns:
-        String result of the email sending operation
-    """
-    result = send_email_with_attachment(to_email, subject, body, attachment_path)
-    
-    if result["status"] == "success":
-        attachment_info = f" with attachment" if result.get("attachment_included") else ""
-        return f"✅ Email sent successfully to {to_email}{attachment_info}! Message ID: {result.get('message_id', 'N/A')}"
-    else:
-        return f"❌ Failed to send email to {to_email}. Error: {result.get('error', 'Unknown error')}"
-
-
-def send_crafted_email(crafted_email: Dict[str, str], attachment_path: Optional[str] = None) -> str:
-    """
-    Tool function to send email from crafted_email data structure.
-    
-    Args:
-        crafted_email: Dict with 'to', 'subject', 'body' keys
-        attachment_path: Optional path to attachment file
-        
-    Returns:
-        String result of the email sending operation
-    """
-    try:
-        to_email = crafted_email.get('to', '')
-        subject = crafted_email.get('subject', '')
-        body = crafted_email.get('body', '')
-        
-        if not all([to_email, subject, body]):
-            return "❌ Invalid crafted_email data: missing to, subject, or body fields"
-        
-        return gmail_send_tool(to_email, subject, body, attachment_path)
-        
-    except Exception as e:
-        return f"❌ Error processing crafted email: {str(e)}"
+send_email = FunctionTool(func=send_email_with_attachment)

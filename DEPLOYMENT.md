@@ -97,8 +97,8 @@ The application will automatically use default credentials from the attached ser
 ```bash
 # Test email sending
 python -c "
-from sdr.sdr.sub_agents.outreach_email_agent.tools.gmail_service_account_tool import gmail_send_tool
-result = gmail_send_tool('test@example.com', 'Test Subject', 'Test Body')
+from sdr.sdr.sub_agents.outreach_email_agent.tools.gmail_service_account_tool import send_email_with_attachment
+result = send_email_with_attachment('meinnps@gmail.com', 'Test Subject', 'Test Body')
 print(result)
 "
 ```

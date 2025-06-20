@@ -1020,7 +1020,8 @@ async function submitWebsiteUrl() {
         if (response.ok) {
             await response.json(); // Response received but not used
             showToast('Website URL submitted successfully!', 'success');
-            // Don't close dialog here - let WebSocket message handle it to avoid race condition
+            // Close the human input dialog here to prevent it from reappearing if no WebSocket event arrives
+            closeHumanInputDialog();
         } else {
             const error = await response.json();
             showToast(`Error: ${error.message || 'Failed to submit URL'}`, 'error');
