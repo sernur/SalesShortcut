@@ -540,6 +540,162 @@ async def call_sdr_agent(business_data: dict[str, Any], session_id: str) -> dict
     else:
         return await call_sdr_agent_simple(business_data, session_id)
 
+async def call_lead_manager_agent_a2a(query: str, session_id: str) -> dict[str, Any]:
+    """
+    Calls the Lead Manager agent via A2A to process lead management tasks.
+    """
+    business_logger = logging.getLogger(BUSINESS_LOGIC_LOGGER)
+    
+    lead_manager_url = os.environ.get(
+        "LEAD_MANAGER_SERVICE_URL", config.DEFAULT_LEAD_MANAGER_URL
+    ).rstrip("/")
+    
+    business_logger.info(f"Calling Lead Manager at {lead_manager_url} for query: {query}")
+    
+    outcome = {
+        "success": False,
+        "message": None,
+        "error": None,
+    }
+    
+    try:
+        async with httpx.AsyncClient() as http_client:
+            a2a_client = A2AClient(httpx_client=http_client, url=lead_manager_url)
+            
+            # Prepare A2A message
+            a2a_task_id = f"lead-management-{session_id}"
+            
+            lead_data = {
+                "query": query,
+                "ui_client_url": config.DEFAULT_UI_CLIENT_URL
+            }
+            
+            sdk_message = A2AMessage(
+                taskId=a2a_task_id,
+                contextId=session_id,
+                messageId=str(uuid.uuid4()),
+                role=A2ARole.user,
+                parts=[A2ADataPart(data=lead_data)],
+                metadata={"operation": "process_lead_management", "query": query},
+            )
+            
+            sdk_send_params = MessageSendParams(
+                message=sdk_message,
+                configuration=MessageSendConfiguration(
+                    acceptedOutputModes=["data", "application/json"]
+                ),
+            )
+            
+            sdk_request = SendMessageRequest(
+                id=str(uuid.uuid4()), params=sdk_send_params
+            )
+            
+            # Send request to Lead Manager
+            response: SendMessageResponse = await a2a_client.send_message(sdk_request)
+            root_response_part = response.root
+            
+            if isinstance(root_response_part, JSONRPCErrorResponse):
+                actual_error = root_response_part.error
+                business_logger.error(
+                    f"A2A Error from Lead Manager: {actual_error.code} - {actual_error.message}"
+                )
+                outcome["error"] = f"A2A Error: {actual_error.code} - {actual_error.message}"
+                
+            elif isinstance(root_response_part, SendMessageSuccessResponse):
+                task_result: A2ATask = root_response_part.result
+                business_logger.info(
+                    f"Lead Manager task {task_result.id} completed with state: {task_result.status.state}"
+                )
+                
+                # Extract result from artifacts
+                if task_result.artifacts:
+                    lead_management_artifact = next(
+                        (
+                            a
+                            for a in task_result.artifacts
+                            if a.name == config.DEFAULT_LEAD_MANAGER_ARTIFACT_NAME
+                        ),
+                        None,
+                    )
+                    
+                    if lead_management_artifact and lead_management_artifact.parts:
+                        art_part_root = lead_management_artifact.parts[0].root
+                        if isinstance(art_part_root, A2ADataPart):
+                            result_data = art_part_root.data
+                            business_logger.info(f"Lead Manager Result: {result_data}")
+                            outcome["success"] = True
+                            outcome["message"] = result_data.get("message", "Lead management task completed")
+                
+                if not outcome["success"]:
+                    outcome["success"] = True
+                    outcome["message"] = "Lead management task completed successfully"
+                
+            else:
+                business_logger.error(f"Invalid A2A response type: {type(root_response_part)}")
+                outcome["error"] = "Invalid response type"
+                
+    except Exception as e:
+        business_logger.error(f"Unexpected error calling Lead Manager: {e}", exc_info=True)
+        outcome["error"] = f"Unexpected error: {e}"
+    
+    return outcome
+
+async def call_lead_manager_agent_simple(query: str, session_id: str) -> dict[str, Any]:
+    """
+    Calls the Lead Manager service via simple HTTP POST when A2A is not available.
+    """
+    business_logger = logging.getLogger(BUSINESS_LOGIC_LOGGER)
+    
+    lead_manager_url = os.environ.get(
+        "LEAD_MANAGER_SERVICE_URL", config.DEFAULT_LEAD_MANAGER_URL
+    ).rstrip("/")
+    
+    business_logger.info(f"Calling Lead Manager (simple) at {lead_manager_url} for query: {query}")
+    
+    outcome = {
+        "success": False,
+        "message": None,
+        "error": None,
+    }
+    
+    try:
+        async with httpx.AsyncClient() as http_client:
+            payload = {
+                "query": query,
+                "ui_client_url": config.DEFAULT_UI_CLIENT_URL
+            }
+            
+            response = await http_client.post(
+                f"{lead_manager_url}/search",
+                json=payload,
+                timeout=30.0
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                business_logger.info(f"Lead Manager (simple) responded: {result}")
+                outcome["success"] = True
+                outcome["message"] = result.get("message", "Lead management completed successfully")
+            else:
+                error_msg = f"HTTP {response.status_code}: {response.text}"
+                business_logger.error(f"Lead Manager (simple) error: {error_msg}")
+                outcome["error"] = error_msg
+                
+    except Exception as e:
+        business_logger.error(f"Unexpected error calling Lead Manager (simple): {e}", exc_info=True)
+        outcome["error"] = f"Unexpected error: {e}"
+    
+    return outcome
+
+async def call_lead_manager_agent(query: str, session_id: str) -> dict[str, Any]:
+    """
+    Calls the Lead Manager agent - uses A2A if available, otherwise falls back to simple HTTP.
+    """
+    if A2A_AVAILABLE:
+        return await call_lead_manager_agent_a2a(query, session_id)
+    else:
+        return await call_lead_manager_agent_simple(query, session_id)
+
 async def run_lead_finding_process(city: str, session_id: str):
     """Run the complete lead finding process."""
     business_logger = logging.getLogger(BUSINESS_LOGIC_LOGGER)
@@ -842,6 +998,84 @@ async def reset_state():
     })
     
     return RedirectResponse("/", status_code=303)
+
+@app.post("/trigger_lead_manager")
+async def trigger_lead_manager():
+    """Trigger the Lead Manager agent manually."""
+    logger.info("Manual trigger for Lead Manager agent requested")
+    
+    try:
+        # Get or create session ID
+        session_id = app_state.get("session_id")
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            app_state["session_id"] = session_id
+        
+        # Send initial update
+        await manager.send_update({
+            "type": "agent_status",
+            "agent": "lead_manager",
+            "status": "active",
+            "message": "Lead Manager agent triggered manually",
+            "timestamp": datetime.now().isoformat(),
+        })
+        
+        # Call Lead Manager agent
+        result = await call_lead_manager_agent("check_lead_emails", session_id)
+        
+        if result["success"]:
+            logger.info(f"Lead Manager agent triggered successfully: {result['message']}")
+            
+            # Send success update
+            await manager.send_update({
+                "type": "agent_status", 
+                "agent": "lead_manager",
+                "status": "idle",
+                "message": result["message"] or "Lead management completed successfully",
+                "timestamp": datetime.now().isoformat(),
+            })
+            
+            return JSONResponse(
+                status_code=200,
+                content={
+                    "status": "success",
+                    "message": result["message"] or "Lead Manager agent triggered successfully",
+                    "timestamp": datetime.now().isoformat()
+                }
+            )
+        else:
+            logger.error(f"Lead Manager agent failed: {result['error']}")
+            
+            # Send error update
+            await manager.send_update({
+                "type": "agent_status",
+                "agent": "lead_manager", 
+                "status": "error",
+                "message": f"Error: {result['error']}",
+                "timestamp": datetime.now().isoformat(),
+            })
+            
+            return JSONResponse(
+                status_code=500,
+                content={"error": result["error"]}
+            )
+            
+    except Exception as e:
+        logger.error(f"Error triggering Lead Manager agent: {e}", exc_info=True)
+        
+        # Send error update
+        await manager.send_update({
+            "type": "agent_status",
+            "agent": "lead_manager",
+            "status": "error", 
+            "message": f"Error triggering agent: {e}",
+            "timestamp": datetime.now().isoformat(),
+        })
+        
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to trigger Lead Manager: {e}"}
+        )
 
 @app.post("/api/human-input")
 async def receive_human_input_request(request: HumanInputRequest):

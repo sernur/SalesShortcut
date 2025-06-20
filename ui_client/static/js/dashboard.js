@@ -1036,7 +1036,7 @@ async function submitWebsiteUrl() {
     }
 }
 
-// Handle ESC key for human input modal
+// Handle ESC key for human input modal and keyboard shortcuts
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         const overlay = document.getElementById('human-input-dialog-overlay');
@@ -1044,7 +1044,57 @@ document.addEventListener('keydown', function(event) {
             closeHumanInputDialog();
         }
     }
+    
+    // Keyboard shortcut: Ctrl+Shift+L to trigger Lead Manager
+    if (event.ctrlKey && event.shiftKey && event.key === 'L') {
+        event.preventDefault();
+        console.log('🔥 Keyboard shortcut triggered: Ctrl+Shift+L - Triggering Lead Manager');
+        triggerLeadManager();
+    }
 });
+
+// Function to trigger lead manager agent
+async function triggerLeadManager() {
+    console.log('🤖 Triggering Lead Manager agent...');
+    
+    try {
+        const response = await fetch('/trigger_lead_manager', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                trigger: 'manual',
+                timestamp: new Date().toISOString()
+            })
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            let errorMessage = 'Failed to trigger Lead Manager agent';
+            try {
+                const errorResult = JSON.parse(errorText);
+                errorMessage = errorResult.error || errorMessage;
+            } catch (e) {
+                errorMessage = `Server error: ${response.status} ${response.statusText}`;
+            }
+            throw new Error(errorMessage);
+        }
+        
+        const result = await response.json();
+        console.log('✅ Lead Manager agent triggered successfully:', result);
+        showToast('Lead Manager agent triggered successfully!', 'success');
+        
+        // Add activity log entry
+        if (window.dashboard) {
+            window.dashboard.addActivityLogEntry('lead_manager', 'Agent triggered manually', new Date().toISOString());
+        }
+        
+    } catch (error) {
+        console.error('❌ Error triggering Lead Manager agent:', error);
+        showToast(`Error: ${error.message}`, 'error');
+    }
+}
 
 // Test function to manually trigger human input dialog
 function testHumanInputDialog() {

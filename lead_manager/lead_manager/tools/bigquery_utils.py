@@ -1,6 +1,7 @@
 """
 BigQuery utility tools for Lead Manager.
 """
+import asyncio
 import json
 import logging
 from datetime import datetime
@@ -13,6 +14,8 @@ from ..config import PROJECT, DATASET_ID, TABLE_ID, MEETING_TABLE_ID
 
 logger = logging.getLogger(__name__)
 
+
+# TODO(sergazy): Implement these
 def _write_json_file(filepath: Path, data: Dict[str, Any]) -> None:
     """Helper function to write JSON data to file."""
     output_data = {
@@ -23,7 +26,7 @@ def _write_json_file(filepath: Path, data: Dict[str, Any]) -> None:
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(output_data, f, indent=2, ensure_ascii=False)
 
-async def check_hot_lead(email_address: str) -> Dict[str, Any]:
+async def check_hot_lead(email_address: str) -> bool:
     """
     Check if an email address is in the hot leads database.
     
@@ -31,71 +34,79 @@ async def check_hot_lead(email_address: str) -> Dict[str, Any]:
         email_address: Email address to check
         
     Returns:
-        Dictionary containing hot lead check result
+        bool indicating if the email is a hot lead or not, along with lead data if found.
     """
-    try:
-        logger.info(f"🔍 Checking if {email_address} is a hot lead...")
+    
+    # Sleep for 2 sec
+    await asyncio.sleep(2)
+    if email_address.lower() == "meinnps@gmail.com":
+        logger.info(f"✅ {email_address} is a hot lead (mocked for testing)")
+        return True
+    else:
+        return False
+    # try:
+    #     logger.info(f"🔍 Checking if {email_address} is a hot lead...")
         
-        # Initialize BigQuery client
-        client = bigquery.Client(project=PROJECT)
+    #     # Initialize BigQuery client
+    #     client = bigquery.Client(project=PROJECT)
         
-        # Query to check if email exists in hot leads table
-        query = f"""
-        SELECT 
-            *
-        FROM `{PROJECT}.{DATASET_ID}.{TABLE_ID}`
-        WHERE LOWER(email) = LOWER(@email_address)
-        LIMIT 1
-        """
+    #     # Query to check if email exists in hot leads table
+    #     query = f"""
+    #     SELECT 
+    #         *
+    #     FROM `{PROJECT}.{DATASET_ID}.{TABLE_ID}`
+    #     WHERE LOWER(email) = LOWER(@email_address)
+    #     LIMIT 1
+    #     """
         
-        # Configure query parameters
-        job_config = bigquery.QueryJobConfig(
-            query_parameters=[
-                bigquery.ScalarQueryParameter("email_address", "STRING", email_address),
-            ]
-        )
+    #     # Configure query parameters
+    #     job_config = bigquery.QueryJobConfig(
+    #         query_parameters=[
+    #             bigquery.ScalarQueryParameter("email_address", "STRING", email_address),
+    #         ]
+    #     )
         
-        # Execute query
-        query_job = client.query(query, job_config=job_config)
-        results = list(query_job)
+    #     # Execute query
+    #     query_job = client.query(query, job_config=job_config)
+    #     results = list(query_job)
         
-        if not results:
-            logger.info(f"❌ {email_address} is not a hot lead")
-            return {
-                "success": True,
-                "is_hot_lead": False,
-                "email": email_address,
-                "lead_data": None,
-                "message": f"{email_address} is not found in hot leads database"
-            }
+    #     if not results:
+    #         logger.info(f"❌ {email_address} is not a hot lead")
+    #         return {
+    #             "success": True,
+    #             "is_hot_lead": False,
+    #             "email": email_address,
+    #             "lead_data": None,
+    #             "message": f"{email_address} is not found in hot leads database"
+    #         }
         
-        # Convert BigQuery row to dictionary
-        lead_data = dict(results[0])
+    #     # Convert BigQuery row to dictionary
+    #     lead_data = dict(results[0])
         
-        # Convert any datetime objects to strings for JSON serialization
-        for key, value in lead_data.items():
-            if isinstance(value, datetime):
-                lead_data[key] = value.isoformat()
+    #     # Convert any datetime objects to strings for JSON serialization
+    #     for key, value in lead_data.items():
+    #         if isinstance(value, datetime):
+    #             lead_data[key] = value.isoformat()
         
-        logger.info(f"✅ {email_address} is a hot lead!")
-        return {
-            "success": True,
-            "is_hot_lead": True,
-            "email": email_address,
-            "lead_data": lead_data,
-            "message": f"{email_address} found in hot leads database"
-        }
+    #     logger.info(f"✅ {email_address} is a hot lead!")
+    #     return {
+    #         "success": True,
+    #         "is_hot_lead": True,
+    #         "email": email_address,
+    #         "lead_data": lead_data,
+    #         "message": f"{email_address} found in hot leads database"
+    #     }
         
-    except Exception as e:
-        logger.error(f"❌ Error checking hot lead: {e}")
-        return {
-            "success": False,
-            "is_hot_lead": False,
-            "email": email_address,
-            "lead_data": None,
-            "error": str(e),
-            "message": f"Error checking hot lead status: {str(e)}"
-        }
+    # except Exception as e:
+    #     logger.error(f"❌ Error checking hot lead: {e}")
+    #     return {
+    #         "success": False,
+    #         "is_hot_lead": False,
+    #         "email": email_address,
+    #         "lead_data": None,
+    #         "error": str(e),
+    #         "message": f"Error checking hot lead status: {str(e)}"
+    #     }
 
 async def save_meeting_arrangement(
     lead_data: Dict[str, Any],

@@ -2,7 +2,9 @@
 Email Analyzer Agent for analyzing emails and identifying hot leads with meeting requests.
 """
 
+import json
 import logging
+import re
 from typing import AsyncGenerator, Dict, Any
 from typing_extensions import override
 
@@ -11,7 +13,7 @@ from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events import Event
 from google.genai import types
 
-from ..tools.bigquery_utils import check_hot_lead_tool
+from ..tools.bigquery_utils import check_hot_lead
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +43,7 @@ class EmailAnalyzer(BaseAgent):
             sub_agents=sub_agents_list
         )
 
-    async def _is_meeting_request_llm(self, email_data: Dict[str, Any], ctx: InvocationContext) -> bool:
+    async def _is_meeting_request_llm(self, email_data: Dict[str, Any], ctx: InvocationContext) -> dict:
         """
         Use LLM to analyze email content to determine if it's a meeting request.
         
@@ -50,47 +52,40 @@ class EmailAnalyzer(BaseAgent):
             ctx: Invocation context for LLM access
             
         Returns:
-            True if the email appears to be a meeting request
+            A dictionary with the calendar request data
         """
         from google.genai import GenerativeModel
         from ..config import MODEL
+        from ..prompts import EMAIL_ANALYZER_PROMPT
         
         try:
             # Create the LLM prompt for meeting request analysis
-            analysis_prompt = f"""
-You are an expert email analyzer. Analyze the following email to determine if it contains a meeting request or scheduling inquiry.
+            analysis_prompt = EMAIL_ANALYZER_PROMPT.format(**email_data)
 
-Email Details:
-From: {email_data.get('sender', 'Unknown')}
-Subject: {email_data.get('subject', 'No Subject')}
-Body: {email_data.get('body', 'No body content')}
-
-Instructions:
-1. Analyze the email content for meeting requests, scheduling inquiries, or appointment requests
-2. Look for explicit requests like "Can we schedule a meeting?", "Are you available for a call?", etc.
-3. Look for implied requests like "I'd like to discuss", "Let's talk about", "When would be a good time", etc.
-4. Consider time-related references and availability questions
-5. Consider demo requests, consultation requests, or "let's connect" type messages
-6. Ignore automated emails, newsletters, or purely informational messages
-
-Respond with ONLY "YES" if this email contains a meeting/scheduling request, or "NO" if it does not.
-
-Response:"""
-            
             # Initialize the model
+            analysis_prompt = EMAIL_ANALYZER_PROMPT.format(email_data=email_data)
+
+            # Initialize the model and generate the response
             model = GenerativeModel(MODEL)
+            response = await model.generate_content_async(analysis_prompt)
+
+            # --- PARSING AND VALIDATION LOGIC ---
+            response_text = response.text.strip()
             
-            # Generate response
-            response = model.generate_content(analysis_prompt)
+            # 1. Clean the string to remove markdown fences (e.g., ```json)
+            if "```" in response_text:
+                match = re.search(r"```json\s*([\s\S]*?)\s*```", response_text)
+                if match:
+                    response_text = match.group(1)
             
-            # Parse the response
-            response_text = response.text.strip().upper()
+            # 2. Parse the cleaned string into a dictionary
+            parsed_data = json.loads(response_text)
             
-            is_meeting_request = response_text == "YES"
-            
-            logger.info(f"LLM analysis for {email_data.get('sender_email')}: {response_text} -> {is_meeting_request}")
-            
-            return is_meeting_request
+            return parsed_data
+        
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON parsing error in LLM response for {email_data.get('sender_email')}: {e}")
+            return {"status": "no_meeting_request", "error": str(e)}
             
         except Exception as e:
             logger.error(f"Error in LLM meeting analysis for {email_data.get('sender_email')}: {e}")
@@ -167,8 +162,6 @@ Response:"""
 
         logger.info(f"[{self.name}] Analyzing {len(emails)} emails for hot leads...")
 
-        # Loop through emails to find hot leads with meeting requests
-        hot_lead_email_found = None
         
         for i, email_data in enumerate(emails):
             sender_email = email_data.get("sender_email", "")
@@ -179,66 +172,50 @@ Response:"""
             # Check if sender is a hot lead using BigQuery tool
             try:
                 # Call the check_hot_lead tool function directly
-                hot_lead_result = await check_hot_lead_tool.func(sender_email)
+                hot_lead_result = await check_hot_lead(sender_email)
                 
-                if hot_lead_result.get("is_hot_lead", False):
+                ctx.session.state["hot_lead_email"] = "no_action_needed"
+                if hot_lead_result:
                     logger.info(f"[{self.name}] Hot lead identified: {sender_email}")
                     
                     # Check if this email contains a meeting request using LLM
-                    if await self._is_meeting_request_llm(email_data, ctx):
+                    calendar_request_data = await self._is_meeting_request_llm(email_data, ctx)
+
+                    # If calendar_request_data['status'] == no_meeting_request skip
+                    if isinstance(calendar_request_data, dict) and calendar_request_data.get("status") == "meeting_request":
                         logger.info(f"[{self.name}] Meeting request found from hot lead: {sender_email}")
                         
-                        # Store the hot lead email and lead data for processing
-                        hot_lead_email_found = {
-                            "email_data": email_data,
-                            "lead_data": hot_lead_result.get("lead_data", {}),
-                            "sender_email": sender_email
-                        }
+                        logger.info(f"[{self.name}] Triggering CalendarOrganizerAgent for hot lead meeting request...")
                         
-                        # Store in session state
-                        ctx.session.state["hot_lead_email"] = hot_lead_email_found
-                        
-                        yield Event(
-                            content=types.Content(
-                                parts=[
-                                    types.Part(
-                                        text=f"Hot lead meeting request identified from {sender_email}. Proceeding to calendar organization."
-                                    )
-                                ]
-                            ),
-                            author=self.name,
-                        )
-                        
+                        ctx.session.state["calendar_request"] = calendar_request_data
+                        async for event in self.calendar_organizer_agent.run_async(ctx):
+                            logger.info(f"[{self.name}] Event from CalendarOrganizerAgent: {event.model_dump_json(indent=2, exclude_none=True)}")
+                            yield event
+                            
                         # Stop the loop and trigger calendar organizer
                         break
                     else:
-                        logger.info(f"[{self.name}] Hot lead {sender_email} email does not contain meeting request.")
+                        logger.info(f"[{self.name}]! ! ! Hot lead But {sender_email} email does not contain meeting request.")
+                        ## TODO: Handle conversation with hot lead without meeting request
                 else:
-                    logger.info(f"[{self.name}] {sender_email} is not a hot lead.")
+                    logger.info(f"[{self.name}] {sender_email} IS NOT a hot lead.")
                     
             except Exception as e:
                 logger.error(f"[{self.name}] Error checking hot lead status for {sender_email}: {e}")
                 continue
-
-        # If we found a hot lead email with meeting request, trigger calendar organizer
-        if hot_lead_email_found:
-            logger.info(f"[{self.name}] Triggering CalendarOrganizerAgent for hot lead meeting request...")
-            async for event in self.calendar_organizer_agent.run_async(ctx):
-                logger.info(f"[{self.name}] Event from CalendarOrganizerAgent: {event.model_dump_json(indent=2, exclude_none=True)}")
-                yield event
-        else:
             # No hot lead meeting requests found
-            logger.info(f"[{self.name}] No hot lead meeting requests found in {len(emails)} emails.")
-            ctx.session.state["hot_lead_email"] = "no_action_needed"
-            yield Event(
-                content=types.Content(
-                    parts=[
-                        types.Part(
-                            text=f"Analyzed {len(emails)} emails. No hot lead meeting requests found."
-                        )
-                    ]
-                ),
-                author=self.name,
-            )
+        logger.info(f"[{self.name}] No hot lead meeting requests found in {len(emails)} emails.")
+        
+        ctx.session.state["hot_lead_email"] = "no_action_needed"
+        yield Event(
+            content=types.Content(
+                parts=[
+                    types.Part(
+                        text=f"Analyzed {len(emails)} emails. No hot lead meeting requests found."
+                    )
+                ]
+            ),
+            author=self.name,
+        )
 
         logger.info(f"[{self.name}] Email analysis workflow finished.")

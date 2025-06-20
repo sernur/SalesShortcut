@@ -4,7 +4,7 @@ UI Notification tool for Lead Manager.
 
 import logging
 import os
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime
 
 import httpx
@@ -121,67 +121,67 @@ async def notify_meeting_arranged(
             "message": f"Unexpected error sending notification: {str(e)}"
         }
 
-async def notify_processing_status(
-    status: str,
-    message: str,
-    data: Dict[str, Any] = None
-) -> Dict[str, Any]:
-    """
-    Send a general status notification to the UI.
+# async def notify_processing_status(
+#     status: str,
+#     message: str,
+#     data: Optional[Dict[str, Any]] = None
+# ) -> Dict[str, Any]:
+#     """
+#     Send a general status notification to the UI.
     
-    Args:
-        status: Status type (processing, error, completed, etc.)
-        message: Status message
-        data: Optional additional data
+#     Args:
+#         status: Status type (processing, error, completed, etc.)
+#         message: Status message
+#         data: Optional additional data
         
-    Returns:
-        Dictionary containing notification result
-    """
-    try:
-        logger.info(f"📤 Sending status notification: {status} - {message}")
+#     Returns:
+#         Dictionary containing notification result
+#     """
+#     try:
+#         logger.info(f"📤 Sending status notification: {status} - {message}")
         
-        # Get UI client URL
-        ui_client_url = os.environ.get(
-            "UI_CLIENT_SERVICE_URL", config.DEFAULT_UI_CLIENT_URL
-        ).rstrip("/")
-        callback_endpoint = f"{ui_client_url}/agent_callback"
+#         # Get UI client URL
+#         ui_client_url = os.environ.get(
+#             "UI_CLIENT_SERVICE_URL", config.DEFAULT_UI_CLIENT_URL
+#         ).rstrip("/")
+#         callback_endpoint = f"{ui_client_url}/agent_callback"
         
-        # Prepare notification payload
-        payload = {
-            "agent_type": "lead_manager",
-            "business_id": None,
-            "status": status,
-            "message": message,
-            "timestamp": datetime.now().isoformat(),
-            "data": data or {}
-        }
+#         # Prepare notification payload
+#         payload = {
+#             "agent_type": "lead_manager",
+#             "business_id": None,
+#             "status": status,
+#             "message": message,
+#             "timestamp": datetime.now().isoformat(),
+#             "data": data or {}
+#         }
         
-        # Send notification
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                callback_endpoint, 
-                json=payload, 
-                timeout=10.0
-            )
-            response.raise_for_status()
+#         # Send notification
+#         async with httpx.AsyncClient() as client:
+#             response = await client.post(
+#                 callback_endpoint, 
+#                 json=payload, 
+#                 timeout=10.0
+#             )
+#             response.raise_for_status()
             
-        logger.info(f"✅ Status notification sent successfully")
+#         logger.info(f"✅ Status notification sent successfully")
         
-        return {
-            "success": True,
-            "status_code": response.status_code,
-            "message": "Status notification sent successfully"
-        }
+#         return {
+#             "success": True,
+#             "status_code": response.status_code,
+#             "message": "Status notification sent successfully"
+#         }
         
-    except Exception as e:
-        logger.error(f"❌ Error sending status notification: {e}")
-        return {
-            "success": False,
-            "error": str(e),
-            "message": f"Error sending status notification: {str(e)}"
-        }
+#     except Exception as e:
+#         logger.error(f"❌ Error sending status notification: {e}")
+#         return {
+#             "success": False,
+#             "error": str(e),
+#             "message": f"Error sending status notification: {str(e)}"
+#         }
 
-# Create the tools
+# # Create the tools
+# notify_status_tool = FunctionTool(func=notify_processing_status)
+
 notify_meeting_tool = FunctionTool(func=notify_meeting_arranged)
-
-notify_status_tool = FunctionTool(func=notify_processing_status)

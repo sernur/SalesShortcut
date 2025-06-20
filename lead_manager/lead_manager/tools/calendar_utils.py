@@ -4,7 +4,7 @@ Google Calendar utility tools for Lead Manager.
 
 import uuid
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from datetime import datetime, timedelta
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -203,10 +203,10 @@ async def check_calendar_availability(days_ahead: int = 7) -> Dict[str, Any]:
 async def create_meeting_with_lead(
     lead_name: str,
     lead_email: str,
-    meeting_subject: str = None,
+    meeting_subject: Optional[str] = None,
     duration_minutes: int = 60,
-    preferred_date: str = None,
-    preferred_time: str = None
+    preferred_date: Optional[str] = None,
+    preferred_time: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Create a meeting with a hot lead.
