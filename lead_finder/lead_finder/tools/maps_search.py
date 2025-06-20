@@ -22,6 +22,7 @@ class GoogleMapsClient:
         """Initialize the Google Maps client."""
         if not GOOGLE_MAPS_API_KEY:
             logger.warning("Google Maps API key not found. Using mock data.")
+            raise ValueError("Google Maps API key is required for Google Maps client initialization.")
             return
         
         try:
