@@ -27,32 +27,33 @@ class BigQueryClient:
             logger.warning("Google Cloud Project not configured. BigQuery operations will be mocked.")
             return
         
-        # Check if credentials are available
-        import os
-        credentials_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-        if not credentials_path:
-            logger.warning("GOOGLE_APPLICATION_CREDENTIALS not set. BigQuery operations will be mocked.")
-            return
-        
-        if not os.path.exists(credentials_path):
-            logger.warning(f"Credentials file not found at {credentials_path}. BigQuery operations will be mocked.")
-            return
-        
         try:
+            # Initialize client - it will use default credentials (GOOGLE_APPLICATION_CREDENTIALS or ADC)
             self.client = bigquery.Client(project=PROJECT)
             self.dataset_ref = self.client.dataset(DATASET_ID)
             self.table_ref = self.dataset_ref.table(TABLE_ID)
             logger.info(f"BigQuery client initialized for project: {PROJECT}")
             
+            # Ensure dataset exists first
+            self._ensure_dataset_exists()
+            
             # Test the connection by trying to get the dataset
             try:
                 self.client.get_dataset(self.dataset_ref)
                 logger.info(f"Successfully connected to BigQuery dataset: {DATASET_ID}")
+            except NotFound:
+                logger.info(f"Dataset {DATASET_ID} not found, creating it...")
+                self._ensure_dataset_exists()
             except Exception as dataset_error:
                 logger.warning(f"Cannot access BigQuery dataset {DATASET_ID}: {dataset_error}")
-                logger.info("BigQuery operations will use mock fallback")
-                self.client = None
-                return
+                logger.info("Attempting to create dataset...")
+                try:
+                    self._ensure_dataset_exists()
+                except Exception as create_error:
+                    logger.error(f"Failed to create dataset: {create_error}")
+                    logger.info("BigQuery operations will use mock fallback")
+                    self.client = None
+                    return
             
             # Ensure table exists
             self._ensure_table_exists()
