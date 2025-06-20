@@ -34,7 +34,6 @@ TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "")
 TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER", "")
 
 
-<<<<<<< HEAD
 # Google Cloud Client ID for OAuth (Legacy - for backward compatibility)
 GOOGLE_CLOUD_CLIENT_ID = os.getenv("GOOGLE_CLOUD_CLIENT_ID", "")
 GOOGLE_CLOUD_CLIENT_SECRET = os.getenv("GOOGLE_CLOUD_CLIENT_SECRET", "")
@@ -51,12 +50,6 @@ GMAIL_SCOPES = [
     'https://www.googleapis.com/auth/gmail.modify'
 ]
 
-=======
-# Google Cloud Client ID for OAuth
-GOOGLE_CLOUD_CLIENT_ID = os.getenv("GOOGLE_CLOUD_CLIENT_ID", "")
-GOOGLE_CLOUD_CLIENT_SECRET = os.getenv("GOOGLE_CLOUD_CLIENT_SECRET", "")
-
->>>>>>> 8fd75bdebb8a11df573df8b01c6af4935356c8d5
 # Test mode configuration
 TEST_MODE = os.getenv("TEST", "false").lower() == "true"
 

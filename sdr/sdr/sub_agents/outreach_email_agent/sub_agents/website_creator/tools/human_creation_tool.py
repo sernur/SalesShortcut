@@ -35,10 +35,7 @@ class HumanRequest:
 class HumanInteractionManager:
     _instance = None
     _pending_requests: Dict[str, HumanRequest] = {}
-<<<<<<< HEAD
     _active_sessions: set = set()  # Track active sessions to prevent duplicates
-=======
->>>>>>> 8fd75bdebb8a11df573df8b01c6af4935356c8d5
     
     def __new__(cls):
         if cls._instance is None:
@@ -66,7 +63,6 @@ class HumanInteractionManager:
     def cleanup_request(self, request_id: str):
         if request_id in self._pending_requests:
             del self._pending_requests[request_id]
-<<<<<<< HEAD
     
     def is_session_active(self, session_id: str) -> bool:
         return session_id in self._active_sessions
@@ -76,8 +72,6 @@ class HumanInteractionManager:
     
     def mark_session_inactive(self, session_id: str):
         self._active_sessions.discard(session_id)
-=======
->>>>>>> 8fd75bdebb8a11df573df8b01c6af4935356c8d5
 
 async def send_ui_notification(request_id: str, prompt: str, ui_endpoint: str = None, max_retries: int = 3) -> bool:
     """Send notification to UI via REST API with retry logic"""
@@ -173,7 +167,6 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
     if existing_url:
         logger.info(f"Skipping human creation: existing website_preview_link found: {existing_url}")
         return existing_url
-<<<<<<< HEAD
     
     manager = HumanInteractionManager()
     
@@ -197,14 +190,6 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
     logger.info(f"📋 Prompt: {website_creation_prompt[:100]}...")
     logger.debug(f"Full prompt: {website_creation_prompt}")
     logger.info(f"Session ID: {session_id}")
-=======
-    logger.info("🤖 AGENT: Requesting human website creation")
-    logger.info(f"📋 Prompt: {website_creation_prompt[:100]}...")
-    logger.debug(f"Full prompt: {website_creation_prompt}")
-    
-    
-    manager = HumanInteractionManager()
->>>>>>> 8fd75bdebb8a11df573df8b01c6af4935356c8d5
     
     # Create the request
     request_id = manager.create_request(website_creation_prompt)
@@ -237,7 +222,6 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
             # Add a small delay before cleanup to allow UI to complete its callback
             await asyncio.sleep(2)
             manager.cleanup_request(request_id)
-<<<<<<< HEAD
             manager.mark_session_inactive(session_id)
             
             # Clear the website_creation_prompt from state to prevent re-execution
@@ -249,8 +233,6 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
                 except Exception as e:
                     logger.warning(f"Could not clear website_creation_prompt from state: {e}")
             
-=======
->>>>>>> 8fd75bdebb8a11df573df8b01c6af4935356c8d5
             return url_response
         else:
             logger.error("❌ NO RESPONSE: Request timed out or was cancelled")
@@ -259,7 +241,6 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
             
             # Cleanup
             manager.cleanup_request(request_id)
-<<<<<<< HEAD
             manager.mark_session_inactive(session_id)
             
             # Clear the website_creation_prompt from state to prevent re-execution
@@ -271,14 +252,11 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
                 except Exception as e:
                     logger.warning(f"Could not clear website_creation_prompt from state: {e}")
             
-=======
->>>>>>> 8fd75bdebb8a11df573df8b01c6af4935356c8d5
             return f"Human input timeout. Request ID: {request_id}. You can still submit a response via API."
             
     except Exception as e:
         logger.error(f"Error during human interaction: {e}")
         manager.cleanup_request(request_id)
-<<<<<<< HEAD
         manager.mark_session_inactive(session_id)
         
         # Clear the website_creation_prompt from state to prevent re-execution
@@ -290,8 +268,6 @@ async def human_creation(website_creation_prompt: str, tool_context: ToolContext
             except Exception as e:
                 logger.warning(f"Could not clear website_creation_prompt from state: {e}")
         
-=======
->>>>>>> 8fd75bdebb8a11df573df8b01c6af4935356c8d5
         return f"Error: {str(e)}"
 
 # API endpoint functions for external access

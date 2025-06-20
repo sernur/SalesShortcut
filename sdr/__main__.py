@@ -173,12 +173,8 @@ def main(host: str, port: int):
                 data = await request.json()
             except Exception:
                 return JSONResponse({'status': 'failed', 'message': 'Invalid JSON'}, status_code=400)
-<<<<<<< HEAD
             # Accept 'url' or 'response' fields from the human input payload
             url = data.get('url') or data.get('response')
-=======
-            url = data.get('url')
->>>>>>> 8fd75bdebb8a11df573df8b01c6af4935356c8d5
             if not request_id or not url:
                 return JSONResponse({'status': 'failed', 'message': 'Missing request_id or url'}, status_code=400)
             success = submit_human_response(request_id, url)
