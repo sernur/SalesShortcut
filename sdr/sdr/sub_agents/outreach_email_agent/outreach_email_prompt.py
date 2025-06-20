@@ -22,6 +22,26 @@ PROMPT_PREPARE_PROMPT = """
    ### OUTPUT
    Provide the generated prompt in a single string in the state['website_creation_prompt'] key.
    """
+   
+REQUEST_HUMAN_CREATION_PROMPT = """
+   ### ROLE
+   You are an AI agent that requests human input for website creation.
+   
+   ### AVAILABLE TOOLS
+      - **request_human_input_tool**: Send a notification to the UI for human input
+      
+   Demo website creation prompt: {website_creation_prompt}
+   
+   ### INSTRUCTION
+   1. Read the state['website_creation_prompt'] key to understand the requirements for the website creation and pass it to the `request_human_input_tool`.
+   2. Use the `request_human_input_tool` function to send the prompt to the UI for human input.
+   3. Wait for the human to provide the website URL and save it in the `website_preview_link` key.
+   4. Once the URL is received, update the state with the new website link.
+   5. If the human cancels the request, handle it gracefully.
+   6. If the website creation prompt is empty or not provided, do not call any tools and return a message indicating no prompt is available.
+   
+   Provide the website creation prompt under 'website_preview_link' key.
+   """
 
 OFFER_FILE_CREATOR_PROMPT = """
    ### ROLE
@@ -33,6 +53,9 @@ OFFER_FILE_CREATOR_PROMPT = """
    3. **add_content_section_tool**: Add new sections to the proposal at specified positions
    4. **create_offer_file**: Generate a PDF file from the final markdown proposal content
    
+   Refined requirements: {refined_requirements}
+   Demo website preview link: {website_preview_link}
+   
    ### INSTRUCTION
    1. Read the markdown proposal content from the state['refined_requirements'] key.
    2. If content editing is requested, use the appropriate content editing tools:
@@ -40,7 +63,7 @@ OFFER_FILE_CREATOR_PROMPT = """
       - Use `replace_content_section_tool` to update specific sections
       - Use `add_content_section_tool` to add new sections
    3. After any content edits, use `create_offer_file` function to generate the final PDF.
-   4. You should save the result of `create_offer_file` in the state['offer_file_path'] key.
+   4. You should save the result of `create_offer_file` in the 'offer_file_path' key.
    5. Save the output file path in the 'offer_file_path' key.
 
    ### CONTENT EDITING CAPABILITIES
@@ -51,6 +74,7 @@ OFFER_FILE_CREATOR_PROMPT = """
    
    Provide the file path in the 'offer_file_path' key.
    """
+
    
 EMAIL_CRAFTER_PROMPT = """
    ### ROLE
@@ -61,24 +85,26 @@ EMAIL_CRAFTER_PROMPT = """
    2. Read the state['call_result'] key to understand the destination of the email and state['offer_file_path'] for the offer file path.
    3. Use this information to craft a compelling email that addresses the recipient's needs.
    4. Do not just repeat the proposal content, but rather summarize and highlight key points.
-   5. Ensure the email is professional, friendly, and engaging.
-   6. Include a clear call-to-action and next steps of arranging a follow-up meeting.
-   7. For the attachment field: if offer_file_path is provided and not empty, include it; otherwise use an empty string.
-   8. Construct the email structure as follows:
+   5. ALWAYS include the website preview link in the email body to showcase the demo website.
+   6. Ensure the email is professional, friendly, and engaging.
+   7. Include a clear call-to-action and next steps of arranging a follow-up meeting.
+   8. For the attachment field: if offer_file_path is provided and not empty, include it; otherwise use an empty string.
+   9. Construct the email structure as follows:
 
    ### EMAIL STRUCTURE
    `to`: take from state['call_result'].
    `subject`: "Follow-up on Our Recent Call - Proposal for {business_data['company_name']} or see the proposal".
-   `body`: Generate a personalized email body based on the instructions.
-   
+   `body`: Generate a personalized email body based on the instructions with personal website preview link.
+   `attachment`: If state['offer_file_path'] is available, include it; otherwise use an empty string.
+
    ### OUTPUT
    Provide the email content in the following format:
    ```json
    {
    "to": "john.doe@example.com",
    "subject": "Follow-up on Our Recent Call - Proposal for {business_data['company_name']}",
-   "body": "Reach text of the email goes here",
-   "attachment": "path_to_attachment_or_empty_string"  # Include offer_file_path if available, otherwise empty string
+   "body": "Reach text of the email goes here, This is your personal website preview link: {website_preview_link}",
+   "attachment": "offer_file_path"  # Include offer_file_path if available, otherwise empty string
    }
    ```
 
