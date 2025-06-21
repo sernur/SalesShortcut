@@ -4,6 +4,7 @@ Callbacks for the Lead Manager Agent.
 import json
 import logging
 import os
+import re
 from typing import Optional, Dict, Any
 from datetime import datetime
 
@@ -66,65 +67,66 @@ def send_meeting_update_to_ui(meeting_data: Dict[str, Any], lead_data: Dict[str,
 async def post_lead_manager_callback(callback_context: CallbackContext) -> Optional[genai_types.Content]:
     """
     Callback function for Lead Manager Agent completion.
+    This version includes robust parsing for all potential JSON strings from the context.
     """
     agent_name = callback_context.agent_name
     logger.info(f"[Callback] Exiting agent: {agent_name}. Processing final result.")
 
-    # Access the state directly
     context_state = callback_context.state.to_dict()
     logger.info(f"[Callback] Current callback_context.state: {context_state}")
 
-    # Check for meeting arrangement results
-    notification_result = context_state.get('notification_result')
-    meeting_result = context_state.get('meeting_result')
-    hot_lead_email = context_state.get('hot_lead_email')
-
-    if notification_result and notification_result != "no_action_needed":
-        logger.info("[Callback] Meeting arrangement notification found in state.")
+    # ====================================================================
+    # --- FIX: Robustly parse all potential JSON strings from the state ---
+    # ====================================================================
+    
+    # Helper function to safely parse a string that might be markdown-wrapped JSON
+    def safe_json_parse(value: any, key_name: str) -> any:
+        if not isinstance(value, str):
+            return value # It's already an object, return as-is
         
-        # Try to extract meeting and lead data for UI update
-        if isinstance(notification_result, str):
-            try:
-                notification_data = json.loads(notification_result)
-            except json.JSONDecodeError:
-                logger.warning("[Callback] Could not parse notification_result as JSON")
-                notification_data = {"message": notification_result}
+        cleaned_str = value
+        match = re.search(r"```json\s*([\s\S]*?)\s*```", cleaned_str)
+        if match:
+            cleaned_str = match.group(1)
+        
+        try:
+            return json.loads(cleaned_str)
+        except json.JSONDecodeError:
+            logger.warning(f"[Callback] Could not parse '{key_name}' as JSON. Using raw string value.")
+            return value # Return the original string if parsing fails
+
+    notification_data = safe_json_parse(context_state.get('notification_result'), 'notification_result')
+    meeting_data = safe_json_parse(context_state.get('meeting_result'), 'meeting_result')
+    hot_lead_data = safe_json_parse(context_state.get('hot_lead_email'), 'hot_lead_email')
+
+    # ====================================================================
+    # --- Logic now uses the cleaned and parsed data objects ---
+    # ====================================================================
+
+    if notification_data and notification_data != "no_action_needed":
+        logger.info("[Callback] Meeting arrangement results found in state.")
+        
+        # The data is already parsed, now we just use it.
+        # This block can be simplified or enhanced to send specific UI updates.
+        if isinstance(meeting_data, dict) and isinstance(hot_lead_data, dict):
+            lead_data_details = hot_lead_data.get("lead_data", {})
+            logger.info(f"Processing results for lead: {lead_data_details.get('name', 'N/A')}")
+            # Example of sending a structured update
+            # send_meeting_update_to_ui(meeting_data, lead_data_details)
         else:
-            notification_data = notification_result
+            logger.info("Proceeding with general notification.")
 
-        # Also check for structured meeting and lead data
-        if meeting_result and hot_lead_email:
-            try:
-                if isinstance(meeting_result, str):
-                    meeting_data = json.loads(meeting_result)
-                else:
-                    meeting_data = meeting_result
-                    
-                if isinstance(hot_lead_email, str):
-                    hot_lead_data = json.loads(hot_lead_email)
-                else:
-                    hot_lead_data = hot_lead_email
-
-                # Extract lead data
-                lead_data = hot_lead_data.get("lead_data", {})
-                
-                # Send structured update to UI
-                send_meeting_update_to_ui(meeting_data, lead_data)
-                
-            except (json.JSONDecodeError, KeyError, TypeError) as e:
-                logger.warning(f"[Callback] Error processing meeting/lead data for UI update: {e}")
-
-    elif hot_lead_email == "no_action_needed":
+    elif context_state.get('hot_lead_email') == "no_action_needed":
         logger.info("[Callback] No hot lead meeting requests found - no action needed.")
     else:
         logger.warning("[Callback] No meeting arrangement results found in state.")
 
     try:
-        # Save artifacts
+        # Save the parsed Python objects, not the raw strings
         await callback_context.save_artifact("lead_manager_results", {
-            "notification_result": notification_result,
-            "meeting_result": meeting_result,
-            "hot_lead_email": hot_lead_email,
+            "notification_result": notification_data,
+            "meeting_result": meeting_data,
+            "hot_lead_email": hot_lead_data,
             "timestamp": datetime.now().isoformat()
         })
         logger.info("[Callback] Saved artifact for lead manager completion.")

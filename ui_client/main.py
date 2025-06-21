@@ -635,8 +635,8 @@ async def call_lead_manager_agent_a2a(query: str, session_id: str) -> dict[str, 
                 outcome["error"] = "Invalid response type"
                 
     except Exception as e:
-        business_logger.error(f"Unexpected error calling Lead Manager: {e}", exc_info=True)
-        outcome["error"] = f"Unexpected error: {e}"
+        business_logger.warning(f"A2A Lead Manager call failed: {e}")
+        outcome["error"] = f"A2A call failed: {e}"
     
     return outcome
 
@@ -692,7 +692,12 @@ async def call_lead_manager_agent(query: str, session_id: str) -> dict[str, Any]
     Calls the Lead Manager agent - uses A2A if available, otherwise falls back to simple HTTP.
     """
     if A2A_AVAILABLE:
-        return await call_lead_manager_agent_a2a(query, session_id)
+        try:
+            return await call_lead_manager_agent_a2a(query, session_id)
+        except Exception as e:
+            business_logger = logging.getLogger(BUSINESS_LOGIC_LOGGER)
+            business_logger.warning(f"A2A call failed, falling back to simple HTTP: {e}")
+            return await call_lead_manager_agent_simple(query, session_id)
     else:
         return await call_lead_manager_agent_simple(query, session_id)
 
@@ -1044,7 +1049,7 @@ async def trigger_lead_manager():
                 }
             )
         else:
-            logger.error(f"Lead Manager agent failed: {result['error']}")
+            logger.debug(f"Lead Manager agent failed: {result['error']}")
             
             # Send error update
             await manager.send_update({

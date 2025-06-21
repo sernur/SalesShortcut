@@ -103,6 +103,50 @@ print(result)
 "
 ```
 
+# Test marking an email as read (replace with actual message ID)
+```bash
+python -c "
+import asyncio
+from lead_manager.lead_manager.tools.check_email import mark_email_as_read
+result = asyncio.run(mark_email_as_read('1978fa308ab4b4c6'))
+print(result)
+"
+```
+  Test check_calendar_availability:
+
+# Test calendar availability check
+```bash
+python -c "
+import asyncio
+from lead_manager.lead_manager.tools.calendar_utils import check_calendar_availability
+result = asyncio.run(check_calendar_availability(7))
+print(result)
+"
+```
+  Test create_meeting_with_lead  with specific date/time:
+
+  # Test meeting creation with preferred date/time
+```bash
+python -c "
+import asyncio
+from lead_manager.lead_manager.tools.calendar_utils import create_meeting_with_lead
+
+# Notice the attendees parameter is now a simple list of strings
+result = asyncio.run(create_meeting_with_lead(
+    lead_name='Merdan Durdyyev',
+    lead_email='meinnps@gmail.com',
+    meeting_subject='Product Demo',
+    duration_minutes=30,
+    preferred_date='2025-06-27', # Updated date to be in the future
+    preferred_time='14:00',
+    attendees=[ 
+      'another_colleague@zemzen.org',
+      'a_third_person@zemzen.org'
+   ]
+))
+print(result)
+"
+```
 ### Cloud Testing:
 Deploy to your cloud environment and test the email sending functionality through your application's normal workflow.
 

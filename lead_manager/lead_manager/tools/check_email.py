@@ -9,6 +9,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from google.adk.tools import FunctionTool
 from ..config import SERVICE_ACCOUNT_FILE, SALES_EMAIL, GMAIL_SCOPES
+from email.utils import parsedate_to_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +146,7 @@ async def check_unread_emails() -> Dict[str, Any]:
             headers = msg['payload'].get('headers', [])
             subject = next((h['value'] for h in headers if h['name'] == 'Subject'), 'No Subject')
             sender = next((h['value'] for h in headers if h['name'] == 'From'), 'Unknown Sender')
-            date = next((h['value'] for h in headers if h['name'] == 'Date'), 'No Date')
+            date_hdr = next((h['value'] for h in headers if h['name'] == 'Date'), 'No Date')
             thread_id = msg.get('threadId')
             
             # Get message body
@@ -154,16 +155,22 @@ async def check_unread_emails() -> Dict[str, Any]:
             # Get thread details
             thread_info = get_thread_details(service, thread_id)
             
+            # Convert header date to ISO format for JSON serialization
+            try:
+                dt = parsedate_to_datetime(date_hdr)
+                # isoformat will include timezone offset
+                date_received = dt.isoformat()
+            except Exception:
+                date_received = date_hdr
             # Extract sender email address
             sender_email = extract_email_address(sender)
-            
             email_data = {
                 'message_id': message_id,
                 'thread_id': thread_id,
                 'subject': subject,
                 'sender': sender,
                 'sender_email': sender_email,
-                'date': date,
+                'date_received': date_received,
                 'body': body,
                 'preview': body[:200] + '...' if len(body) > 200 else body,
                 'thread_message_count': thread_info['message_count'],
