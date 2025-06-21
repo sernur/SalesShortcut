@@ -48,3 +48,6 @@ SUBSCRIPTION_ID = os.getenv("SUBSCRIPTION_ID", "gmail-notifications-subscription
 
 # GMAIL MONITORING CONFIGURATION
 USERS_TO_MONITOR = os.getenv("USERS_TO_MONITOR", "").split(",")
+# Vertex AI configuration for meeting request analysis
+CLOUD_PROJECT_ID = os.getenv("CLOUD_PROJECT_ID", "")
+CLOUD_PROJECT_REGION = os.getenv("CLOUD_PROJECT_REGION", "")

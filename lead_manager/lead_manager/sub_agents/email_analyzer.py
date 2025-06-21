@@ -15,8 +15,9 @@ from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events import Event
 from google.genai import types
 from ..tools.bigquery_utils import check_hot_lead
-from ..config import MODEL # Assuming MODEL and PROMPT are in your config
+from ..config import MODEL # Assuming MODEL is in your config
 from ..prompts import EMAIL_ANALYZER_PROMPT
+from ..tools.meeting_request_llm import is_meeting_request_llm
 
 logger = logging.getLogger(__name__)
 
@@ -58,44 +59,8 @@ class EmailAnalyzer(BaseAgent):
         )
 
     async def _is_meeting_request_llm(self, email_data: Dict[str, Any], ctx: InvocationContext) -> dict:
-        """
-        Use LLM to analyze email content to determine if it's a meeting request.
-        """
-        sender_email = email_data.get('sender_email_address', email_data.get('sender_email', 'unknown'))
-        
-        try:
-            analysis_prompt = EMAIL_ANALYZER_PROMPT.format(email_data=email_data)
-            
-            combined_schema = {
-                    "type": "object",
-                    "properties": {
-                        "status": {"type": "string", "enum": ["meeting_request", "no_meeting_request"]},
-                        "title": {"type": "string"}, "description": {"type": "string"},
-                        "start_datetime": {"type": "string"}, "end_datetime": {"type": "string"},
-                        "attendees": {"type": "array", "items": {"type": "string"}}
-                    }, "required": ["status"], "additionalProperties": False
-            }
-            
-            # --- FIX 1, PART B: Use the imported 'genai' module ---
-            model = genai.GenerativeModel(MODEL)
-            response = await model.generate_content_async(
-                analysis_prompt,
-                generation_config={"response_schema": combined_schema, "response_mime_type": "application/json"}
-            )
-            
-            raw_response = response.candidates[0].content.parts[0].text
-            return json.loads(raw_response)
-        
-        except Exception as e:
-            # This block now correctly handles real runtime errors, not ImportErrors
-            logger.error(f"[{self.name}] Error in LLM meeting analysis for {sender_email}: {e}")
-            simple_keywords = ['meeting', 'schedule', 'call', 'discuss', 'available', 'appointment']
-            email_text = f"{email_data.get('subject_line', '')} {email_data.get('body_content', '')}".lower()
-            
-            if any(keyword in email_text for keyword in simple_keywords):
-                return {"status": "meeting_request", "fallback": True, "title": f"Meeting with {sender_email}"}
-            else:
-                return {"status": "no_meeting_request", "fallback": True}
+        """Delegate meeting request analysis to the shared tool."""
+        return await is_meeting_request_llm(email_data, self.name)
 
     @override
     async def _run_async_impl(
@@ -105,8 +70,8 @@ class EmailAnalyzer(BaseAgent):
         unread_emails_data = ctx.session.state.get("unread_emails")
 
         if not unread_emails_data:
-            # --- FIX 2: Add author to all Event yields ---
-            yield Event(content=types.Content(parts=[types.Part(text="No unread emails data found.")], author=self.name))
+            logger.info(f"[{self.name}] No unread emails data found in session state.")
+            yield Event(content=types.Content(parts=[types.Part(text="No unread emails data found.")]), author=self.name)
             return
 
         try:
@@ -122,10 +87,10 @@ class EmailAnalyzer(BaseAgent):
             return
 
         emails_list = unread_emails_dict.get("unread_emails", [])
+        logger.info(f"[{self.name}]✅ Found {len(emails_list)} unread emails to analyze.")
         if not emails_list:
             ctx.session.state["meeting_result"] = "no_action_needed"
-            # --- FIX 2: Add author to all Event yields ---
-            yield Event(content=types.Content(parts=[types.Part(text="No unread emails found to analyze.")], author=self.name))
+            yield Event(content=types.Content(parts=[types.Part(text="No unread emails found to analyze.")]), author=self.name)
             return
 
         logger.info(f"[{self.name}] Analyzing {len(emails_list)} emails for hot leads...")
@@ -133,8 +98,10 @@ class EmailAnalyzer(BaseAgent):
         meeting_requests_found = 0
 
         for email_data in emails_list:
-            sender_email = email_data.get("sender_email_address", "")
-            if not sender_email: continue
+            sender_email = email_data.get("sender_email_address", "") or email_data.get("sender_email", "")
+            if not sender_email:
+                logger.warning(f"[{self.name}] No sender email found.")
+                continue
 
             try:
                 # The logic inside this try/except is now correct
@@ -143,17 +110,17 @@ class EmailAnalyzer(BaseAgent):
                     logger.info(f"[{self.name}] Hot lead identified: {sender_email}")
                     
                     calendar_request_data = await self._is_meeting_request_llm(email_data, ctx)
+                    logger.info(f"[{self.name}]✅ LLM analysis result for {sender_email}: {calendar_request_data}")
                     if calendar_request_data.get("status") == "meeting_request":
-                        meeting_requests_found += 1
                         logger.info(f"[{self.name}] Meeting request found from hot lead: {sender_email}")
                         
                         ctx.session.state["calendar_request"] = calendar_request_data
-                        ctx.session.state["hot_lead_email"] = email_data
-                        ctx.session.state["meeting_result"] = "meeting_request_found"
+                        ctx.session.state["email_data"] = emails_list
                         
                         async for event in self.calendar_organizer_agent.run_async(ctx):
                             yield event
-                        return
+                        break
+                    
             except Exception as e:
                 # This will catch errors during check_hot_lead or _is_meeting_request_llm
                 logger.error(f"[{self.name}] Error processing email for {sender_email}: {e}", exc_info=True)

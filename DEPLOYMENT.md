@@ -147,6 +147,16 @@ result = asyncio.run(create_meeting_with_lead(
 print(result)
 "
 ```
+
+# Test meeting request analysis
+```bash
+python -c "
+import asyncio
+from lead_manager.lead_manager.tools.meeting_request_llm import test_is_meeting_request_llm
+print(asyncio.run(test_is_meeting_request_llm()))
+"
+```
+
 ### Cloud Testing:
 Deploy to your cloud environment and test the email sending functionality through your application's normal workflow.
 
