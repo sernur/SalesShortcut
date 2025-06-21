@@ -33,7 +33,7 @@ def create_service_account_credentials():
         google.oauth2.service_account.Credentials: Delegated credentials for the sales email
     """
     try:
-        print(f"🔑 Setting up service account authentication for {SALES_EMAIL}...")
+        logger.info(f"🔑 Setting up service account authentication for {SALES_EMAIL}...")
         logger.info(f"Setting up service account authentication for {SALES_EMAIL}")
         
         # Try to use environment variable for cloud deployment first
@@ -41,14 +41,14 @@ def create_service_account_credentials():
         
         # Check if SERVICE_ACCOUNT_FILE is set (cloud deployment)
         if os.getenv('SERVICE_ACCOUNT_FILE'):
-            print("📁 Using SERVICE_ACCOUNT_FILE environment variable...")
+            logger.info("📁 Using SERVICE_ACCOUNT_FILE environment variable...")
             logger.info(f"Using SERVICE_ACCOUNT_FILE: {os.getenv('SERVICE_ACCOUNT_FILE')}")
             credentials = service_account.Credentials.from_service_account_file(
                 os.getenv('SERVICE_ACCOUNT_FILE'), scopes=GMAIL_SCOPES
             )
         # Check if service account file exists locally
         elif os.path.exists(SERVICE_ACCOUNT_FILE):
-            print(f"📁 Using local service account file: {SERVICE_ACCOUNT_FILE}")
+            logger.info(f"📁 Using local service account file: {SERVICE_ACCOUNT_FILE}")
             logger.info(f"Using local service account file: {SERVICE_ACCOUNT_FILE}")
             credentials = service_account.Credentials.from_service_account_file(
                 SERVICE_ACCOUNT_FILE, scopes=GMAIL_SCOPES
@@ -56,7 +56,7 @@ def create_service_account_credentials():
         else:
             # Try default cloud credentials (for Cloud Run with service account attached)
             try:
-                print("☁️ Attempting to use default Cloud credentials...")
+                logger.info("☁️ Attempting to use default Cloud credentials...")
                 logger.info("Attempting to use default Cloud credentials")
                 from google.auth import default
                 credentials, _ = default(scopes=GMAIL_SCOPES)
@@ -79,12 +79,12 @@ def create_service_account_credentials():
             delegated_credentials = credentials
             logger.info("Using non-delegated credentials")
         
-        print(f"✅ Service account authentication successful for {SALES_EMAIL}")
+        logger.info(f"✅ Service account authentication successful for {SALES_EMAIL}")
         logger.info(f"Service account authentication successful for {SALES_EMAIL}")
         return delegated_credentials
         
     except Exception as e:
-        print(f"❌ Service account setup failed: {e}")
+        logger.error(f"❌ Service account setup failed: {e}")
         logger.error(f"Service account setup failed: {e}", exc_info=True)
         raise
 
@@ -103,21 +103,23 @@ def send_email_with_attachment(to_email: str, subject: str, body: str, attachmen
         dict containing send result with status and message/error info
     """
     try:
-        print(f"📧 Preparing to send email to {to_email}")
-        print(f"   From: {SALES_EMAIL}")
-        print(f"   Subject: {subject}")
+        logger.info("🚀 SEND_EMAIL_WITH_ATTACHMENT FUNCTION CALLED!")
+        logger.info(f"Function called with: to_email={to_email}, subject={subject[:50] if subject else 'None'}..., body_length={len(body) if body else 0}, attachment_path={attachment_path}")
+        logger.info(f"📧 Preparing to send email to {to_email}")
+        logger.info(f"   From: {SALES_EMAIL}")
+        logger.info(f"   Subject: {subject}")
         logger.info(f"Preparing to send email from {SALES_EMAIL} to {to_email}")
         logger.info(f"Subject: {subject}")
         logger.info(f"Body length: {len(body)} characters")
         
         if attachment_path:
-            print(f"   Attachment: {attachment_path}")
+            logger.info(f"   Attachment: {attachment_path}")
             logger.info(f"Attachment path: {attachment_path}")
         
         # Check if attachment exists
         if attachment_path and not os.path.exists(attachment_path):
-            print(f"⚠️  Warning: Attachment file not found at {attachment_path}")
-            print("   Sending email without attachment...")
+            logger.warning(f"⚠️  Warning: Attachment file not found at {attachment_path}")
+            logger.warning("   Sending email without attachment...")
             logger.warning(f"Attachment file not found at {attachment_path}")
             attachment_path = None
         
@@ -132,7 +134,7 @@ def send_email_with_attachment(to_email: str, subject: str, body: str, attachmen
         
         # Create message with or without attachment
         if attachment_path and os.path.exists(attachment_path):
-            print("📎 Adding attachment...")
+            logger.info("📎 Adding attachment...")
             message = MIMEMultipart()
             message.attach(MIMEText(body, 'plain'))
             
@@ -156,7 +158,7 @@ def send_email_with_attachment(to_email: str, subject: str, body: str, attachmen
                 f'attachment; filename= {filename}'
             )
             message.attach(attachment_part)
-            print(f"✅ Attachment added: {filename}")
+            logger.info(f"✅ Attachment added: {filename}")
         else:
             # Simple text message if no attachment
             message = MIMEText(body, 'plain')
@@ -167,7 +169,7 @@ def send_email_with_attachment(to_email: str, subject: str, body: str, attachmen
         message['subject'] = subject
         
         # Send email
-        print("📤 Sending email...")
+        logger.info("📤 Sending email...")
         logger.info("Encoding email message...")
         raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
         logger.info(f"Raw message length: {len(raw_message)} characters")
@@ -181,15 +183,15 @@ def send_email_with_attachment(to_email: str, subject: str, body: str, attachmen
         message_id = result.get('id')
         thread_id = result.get('threadId')
         
-        print("✅ EMAIL SENT SUCCESSFULLY!")
-        print(f"   Message ID: {message_id}")
-        print(f"   Thread ID: {thread_id}")
+        logger.info("✅ EMAIL SENT SUCCESSFULLY!")
+        logger.info(f"   Message ID: {message_id}")
+        logger.info(f"   Thread ID: {thread_id}")
         logger.info(f"Email sent successfully! Message ID: {message_id}, Thread ID: {thread_id}")
         
         if attachment_path and os.path.exists(attachment_path):
-            print(f"   📎 Attachment: {os.path.basename(attachment_path)} included")
+            logger.info(f"   📎 Attachment: {os.path.basename(attachment_path)} included")
             logger.info(f"Attachment included: {os.path.basename(attachment_path)}")
-        print(f"   📬 Check {to_email} inbox!")
+        logger.info(f"   📬 Check {to_email} inbox!")
         
         return {
             "status": "success",
@@ -201,7 +203,7 @@ def send_email_with_attachment(to_email: str, subject: str, body: str, attachmen
         
     except HttpError as error:
         error_details = str(error)
-        print(f"❌ Gmail API error: {error_details}")
+        logger.error(f"❌ Gmail API error: {error_details}")
         logger.error(f"Gmail API error: {error_details}", exc_info=True)
         return {
             "status": "failed",
@@ -210,7 +212,7 @@ def send_email_with_attachment(to_email: str, subject: str, body: str, attachmen
         }
         
     except Exception as e:
-        print(f"❌ Email sending failed: {e}")
+        logger.error(f"❌ Email sending failed: {e}")
         logger.error(f"Email sending failed: {e}", exc_info=True)
         return {
             "status": "failed", 

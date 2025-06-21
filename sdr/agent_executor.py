@@ -126,7 +126,14 @@ class SDRAgentExecutor(AgentExecutor):
                         app_name=self._adk_runner.app_name,
                         user_id="a2a_user",
                         session_id=session_id_for_adk,
-                        state={"business_data": business_data},  # Store business data in session state
+                        state={
+                            "business_data": business_data,
+                            "call_result": '',
+                            "refined_requirements": '',
+                            "website_preview_link": '',
+                            "offer_file_path": '',
+                            "crafted_email": '',
+                        },  # Store business data in session state
                     )
                     if session:
                         logger.info(f"Task {context.task_id}: Successfully created ADK session for business: {business_name}")

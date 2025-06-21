@@ -11,6 +11,9 @@ from google.adk.tools import FunctionTool
 from google.cloud import bigquery
 from ..config import PROJECT, DATASET_ID, TABLE_ID
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 def _write_json_file(filepath: Path, data: Dict[str, Any]) -> None:
     """Helper function to write JSON data to file."""
@@ -39,7 +42,8 @@ async def sdr_bigquery_upload(
     Returns:
         A dictionary containing upload status
     """
-    
+
+    logger.info("⚒️ [TOOL] Starting BigQuery upload process...")
     # Create output file in current directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"sdr_bigquery_upload_{timestamp}.json"

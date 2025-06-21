@@ -198,6 +198,7 @@ async def phone_call(business_data: dict[str, Any], proposal: str, tool_context:
         A dictionary containing test call results
     """
     
+    logger.info("⚒️ [TOOL] 📞 Starting phone call tool...")
     
     # await 3 seconds to ensure the tool context is ready
     await asyncio.sleep(3)

@@ -17,7 +17,7 @@ def edit_proposal_content(current_content: str, edit_instructions: str) -> str:
         str: The edited proposal content
     """
     try:
-        logger.info(f"Processing content edit request - Instructions: {edit_instructions[:100]}...")
+        logger.info(f"⚒️ [TOOL] Processing content edit request - Instructions: {edit_instructions[:100]}...")
         logger.debug(f"Current content length: {len(current_content)} characters")
         
         
@@ -50,7 +50,7 @@ def replace_content_section(current_content: str, section_name: str, new_section
         str: The updated proposal content
     """
     try:
-        logger.info(f"Replacing section: {section_name}")
+        logger.info(f"⚒️ [TOOL] Replacing section: {section_name}")
         logger.debug(f"New section content length: {len(new_section_content)} characters")
         
         
@@ -91,7 +91,7 @@ def add_content_section(current_content: str, section_name: str, section_content
         str: The updated proposal content with the new section
     """
     try:
-        logger.info(f"Adding new section: {section_name} at position: {position}")
+        logger.info(f"⚒️ [TOOL] Adding new section: {section_name} at position: {position}")
         logger.debug(f"Section content length: {len(section_content)} characters")
         
         

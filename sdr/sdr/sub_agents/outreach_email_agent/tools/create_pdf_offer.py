@@ -408,7 +408,7 @@ def create_sales_proposal_pdf(markdown_offer: str) -> str:
     Raises:
         Exception: If an error occurs during PDF generation.
     """
-    logger.info("Starting PDF generation process with `create_sales_proposal_pdf` function.")
+    logger.info("⚒️ [TOOL] Starting PDF generation process with `create_sales_proposal_pdf` function.")
     logger.debug(f"Markdown content length: {len(markdown_offer)} characters")
     
     
@@ -435,7 +435,7 @@ def create_sales_proposal_pdf(markdown_offer: str) -> str:
 
         doc.build(story, onFirstPage=template_drawer, onLaterPages=template_drawer)
 
-        logger.info(f"PDF successfully created: {output_pdf_file}")
+        logger.info(f"✅ PDF successfully created: {output_pdf_file}")
         return output_pdf_file
 
     except Exception as e:

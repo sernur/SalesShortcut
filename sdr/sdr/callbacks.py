@@ -21,7 +21,21 @@ from google.genai import types as genai_types
 
 logger = logging.getLogger(__name__)
 
-def send_update_to_ui(business_data: dict):
+
+# --- New helper function to extract city from address ---
+def extract_city_from_address(address: Optional[str]) -> Optional[str]:
+    """
+    Extracts the city from a standard address string.
+    Assumes address format like: "Street, City, State, Zip"
+    """
+    if not address:
+        return None
+    parts = [p.strip() for p in address.split(',')]
+    if len(parts) >= 2:
+        return parts[1] # City is usually the second part
+    return None
+
+def send_sdr_update_to_ui(business_data: dict, email_sent_result: Optional[dict] = None) -> None:
     """
     Sends a single business update to the UI client's /agent_callback endpoint.
     This function will now ensure a 'city' field is present in the 'data' payload.
@@ -41,16 +55,35 @@ def send_update_to_ui(business_data: dict):
             data_for_ui['city'] = extracted_city
         else:
             logger.warning(f"Could not extract city from address: {data_for_ui.get('address')}. Business may not be created in UI.")
-            # Optionally, you might want to return here or set a default city
-            # if 'city' is strictly required for every business.
 
+    email_sent_result_for_ui = email_sent_result if email_sent_result else {}
+    crafted = email_sent_result_for_ui.get("crafted_email", {})
+    email = crafted.get("email")
+    if email:
+        data_for_ui['email'] = email
+    email_subject = crafted.get("subject")
+    body_preview = crafted.get("body", "").strip()[:50]
+
+    # Build the UI update payload
+    # Include the recipient email in the message so the CONTACTED card shows it
+    if email:
+        message_str = f"Sent outreach email to {data_for_ui.get('name')} at {email}"
+    else:
+        message_str = f"Sent outreach email: {data_for_ui.get('name')}"
     payload = {
         "agent_type": "sdr",
-        "business_id": data_for_ui.get("id"), # Use id from the potentially modified data_for_ui
-        "status": "found",
-        "message": f"Successfully discovered business: {data_for_ui.get('name')}",
+        "business_id": data_for_ui.get("id"),  # Use id from the potentially modified data_for_ui
+        "status": "contacted",
+        "message": message_str,
         "timestamp": datetime.now().isoformat(),
-        "data": data_for_ui # Send the modified data with the top-level 'city'
+        "data": {
+            "name": data_for_ui.get("name"),
+            "city": data_for_ui.get("city"),
+            "phone": data_for_ui.get("phone"),
+            "email": data_for_ui.get("email"),
+            "email_subject": email_subject,
+            "body_preview": body_preview
+        }
     }
 
     logger.info(f"Sending POST to UI endpoint: {callback_endpoint} for business: {data_for_ui.get('name')}")
@@ -68,53 +101,47 @@ def send_update_to_ui(business_data: dict):
 
 async def post_results_callback(callback_context: CallbackContext) -> Optional[genai_types.Content]:
     agent_name = callback_context.agent_name
-    logger.info(f"[Callback] Exiting agent: {agent_name}. Processing final result.")
+    logger.info(f"SDR [Callback] Exiting agent: {agent_name}. Processing final result.")
 
     final_businesses: List[Dict[str, Any]] = []
 
-    # Access the state directly
     context_state = callback_context.state.to_dict()
-    print(f"[Callback] Current callback_context.state: {context_state}")
+    logger.info(f"SDR [Callback] Current callback_context.state: {context_state}")
+    
+    # Helper function to safely parse a string that might be markdown-wrapped JSON
+    def safe_json_parse(value: any, key_name: str) -> any:
+        if not isinstance(value, str):
+            return value # It's already an object, return as-is
 
-    # Check if 'final_sdr_results' key exists in the state
-    if 'final_sdr_results' in context_state:
-        merged_leads_text = context_state['final_sdr_results']
+        cleaned_str = value.strip()
+        match = re.search(r"```json\s*([\s\S]*?)\s*```", cleaned_str)
+        if match:
+            cleaned_str = match.group(1)
         
-        # Use regex to find the JSON block in the text
-        json_match = re.search(r"```json\s*([\s\S]*?)\s*```", merged_leads_text)
-        if json_match:
-            try:
-                json_str = json_match.group(1)
-                parsed_data = json.loads(json_str)
-                if isinstance(parsed_data, list):
-                    final_businesses = parsed_data
-                    logger.info(f"[Callback] Successfully extracted {len(final_businesses)} businesses from callback_context.state.")
-                else:
-                    logger.warning(f"[Callback] Extracted JSON from state is not a list: {parsed_data}")
-            except json.JSONDecodeError as e:
-                logger.error(f"[Callback] Failed to parse JSON from callback_context.state: {e}")
-        else:
-            logger.warning(f"[Callback] No JSON block found in 'final_sdr_results' state data.")
+        try:
+            return json.loads(cleaned_str)
+        except json.JSONDecodeError:
+            logger.warning(f"SDR [Callback] Could not parse '{key_name}' as JSON. Using raw string value.")
+            return value # Return the original string if parsing fails
+
+    
+    business_data = safe_json_parse(context_state.get('business_data'), 'no_business_data')
+    if business_data is None and 'no_business_data' in context_state:
+        logger.warning(f"SDR [Callback] No business data found in state for agent: {agent_name}")
+        return None
+
+    email_sent_result = safe_json_parse(context_state.get('email_sent_result'), 'no_email_sent_result')
+    if email_sent_result is None and 'no_email_sent_result' in context_state:
+        logger.warning(f"SDR [Callback] No email sent result found in state for agent: {agent_name}")
+        return None
+    
+    logger.info(f"SDR [Callback] Business data and email sent result parsed successfully.")
+    
+    if email_sent_result and 'email_sent_result' in email_sent_result:
+        # Pass the inner dictionary, which contains 'crafted_email'
+        send_sdr_update_to_ui(business_data, email_sent_result['email_sent_result'])
     else:
-        logger.warning("[Callback] 'final_sdr_results' not found in callback_context.state.")
-        return None
-
-
-    if not final_businesses:
-        logger.warning("[Callback] No businesses found for UI update. Check MergerAgent's output_key and state propagation.")
-        # For deeper debugging if needed, log the full state
-        logger.warning(f"Full callback_context.state.to_dict(): {context_state}")
-        return None
-
-
-    for biz in final_businesses:
-        if "id" not in biz:
-            # Generate a stable ID based on unique business attributes
-            biz_id_components = [str(biz.get("name", "")), str(biz.get("address", "")), str(biz.get("phone", ""))]
-            # Filter out empty strings/None values before joining for hashing
-            clean_components = [c for c in biz_id_components if c and c != 'None']
-            biz["id"] = "generated_" + str(hash(tuple(clean_components))) if clean_components else str(datetime.now().timestamp())
-        send_update_to_ui(biz)
+        logger.warning("SDR [Callback] 'email_sent_result' key not found in the parsed object.")
 
     try:
         # Saving artifacts
@@ -122,13 +149,13 @@ async def post_results_callback(callback_context: CallbackContext) -> Optional[g
         # but it should not block UI updates now.
         await callback_context.save_artifact("final_lead_results", {
             "businesses": final_businesses,
-            "count": len(final_businesses)
+            "send_email_result": email_sent_result
         })
-        logger.info(f"[Callback] Saved artifact with {len(final_businesses)} businesses for task completion.")
+        logger.info(f"SDR [Callback] Saved artifact with {len(final_businesses)} businesses for task completion.")
     except Exception as e:
-        logger.error(f"[Callback] Error saving final artifact: {e}")
+        logger.error(f"SDR [Callback] Error saving final artifact: {e}")
 
-    logger.info("[Callback] UI updates sent. Callback finished.")
+    logger.info("SDR [Callback] UI updates sent. Callback finished.")
     return None
 
 
