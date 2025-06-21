@@ -234,6 +234,50 @@
                 </div>
             </div>
 
+            <!-- Calendar Agent Column -->
+            <div class="agent-column calendar-column" data-agent="calendar">
+                <div class="column-header">
+                    <div class="agent-icon">
+                        <i class="fas fa-calendar-alt"></i>
+                    </div>
+                    <div class="agent-info">
+                        <h3>Calendar</h3>
+                        <p>Scheduled meetings</p>
+                    </div>
+                    <div class="agent-status" id="calendar-status">
+                        <div class="status-indicator idle"></div>
+                    </div>
+                </div>
+
+                <div class="column-content" id="meeting-scheduled-content">
+                    {% for business in businesses %}
+                        {% if business.status == 'meeting_scheduled' %}
+                        <div class="business-card compact meeting-card" data-business-id="{{ business.id }}">
+                            <div class="business-header">
+                                <div class="business-title">
+                                    <i class="fas fa-handshake meeting-icon"></i>
+                                    <h4>{{ business.name }}</h4>
+                                </div>
+                                <span class="status-badge status-meeting-scheduled">Meeting Scheduled</span>
+                            </div>
+                            <div class="business-details">
+                                <div class="detail">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    <span>{{ business.updated_at|format_datetime }}</span>
+                                </div>
+                                {% if business.notes %}
+                                <div class="compact-notes">
+                                    <i class="fas fa-sticky-note"></i>
+                                    <span>{{ business.notes[-1][:50] }}{% if business.notes[-1]|length > 50 %}...{% endif %}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+
         </div>
 
         <!-- Activity Log -->

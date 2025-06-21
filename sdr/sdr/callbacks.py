@@ -45,7 +45,7 @@ def send_update_to_ui(business_data: dict):
             # if 'city' is strictly required for every business.
 
     payload = {
-        "agent_type": "lead_finder",
+        "agent_type": "sdr",
         "business_id": data_for_ui.get("id"), # Use id from the potentially modified data_for_ui
         "status": "found",
         "message": f"Successfully discovered business: {data_for_ui.get('name')}",

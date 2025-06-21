@@ -40,9 +40,9 @@ async def notify_meeting_arranged(
         
         # Prepare notification payload
         payload = {
-            "agent_type": "lead_manager",
+            "agent_type": "calendar",
             "business_id": lead_data.get("id", f"lead_{lead_data.get('email', 'unknown')}"),
-            "status": "meeting_arranged",
+            "status": "meeting_scheduled",
             "message": f"Meeting arranged with {lead_data.get('name', 'Unknown')} ({lead_data.get('email', 'unknown email')})",
             "timestamp": datetime.now().isoformat(),
             "data": {

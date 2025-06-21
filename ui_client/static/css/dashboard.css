@@ -386,6 +386,25 @@
     box-shadow: 0 2px 4px rgba(245, 158, 11, 0.1);
 }
 
+/* Notification result cards (calendar meeting requests) */
+.notification_result {
+    background: #fff3cd; /* light yellow */
+    border: 1px solid #ffeeba;
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+.notification_result .notification-header h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    color: #856404;
+}
+.notification_result .notification-body p {
+    margin: 0.25rem 0;
+    font-size: 0.85rem;
+    color: #856404;
+}
+
 .business-title {
     display: flex;
     align-items: center;

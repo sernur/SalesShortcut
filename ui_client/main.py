@@ -79,6 +79,7 @@ class AgentType(str, Enum):
     LEAD_FINDER = "lead_finder"
     SDR = "sdr"
     LEAD_MANAGER = "lead_manager"
+    CALENDAR = "calendar"
 
 # Data Models
 class Business(BaseModel):
@@ -794,7 +795,35 @@ async def agent_callback(update: AgentUpdate):
     """
     logger.info(f"Received agent callback: {update.agent_type} for business {update.business_id}")
 
-    # Check if business exists
+    # Special handling for Calendar agent: do not auto-create businesses, only send meeting notifications
+    if update.agent_type == AgentType.CALENDAR:
+        # If the business exists, update its status and send business_updated event
+        if update.business_id in app_state["businesses"]:
+            business = app_state["businesses"][update.business_id]
+            business.status = update.status
+            business.updated_at = datetime.now()
+            business.notes.append(f"{update.agent_type}: {update.message}")
+            logger.info(f"Updated business {business.name} status to {update.status}")
+            biz_payload = {
+                "type": "business_updated",
+                "agent": update.agent_type.value,
+                "business": business.model_dump(),
+                "update": update.model_dump(),
+                "timestamp": datetime.now().isoformat(),
+            }
+            await manager.send_update(biz_payload)
+        # Always send the calendar-specific notification
+        cal_payload = {
+            "type": "calendar_notification",
+            "agent": update.agent_type.value,
+            "business_id": update.business_id,
+            "data": update.data or {},
+            "message": update.message,
+            "timestamp": datetime.now().isoformat(),
+        }
+        await manager.send_update(cal_payload)
+        return JSONResponse(status_code=200, content={"status": "success", "message": "Calendar notification sent"})
+    # Check if business exists for non-calendar agents
     if update.business_id in app_state["businesses"]:
         # Business exists, so update it
         business = app_state["businesses"][update.business_id]
@@ -803,35 +832,64 @@ async def agent_callback(update: AgentUpdate):
         business.notes.append(f"{update.agent_type}: {update.message}")
         logger.info(f"Updated business {business.name} status to {update.status}")
     else:
-        # Business does NOT exist, so create it from the callback data
-        logger.info(f"Business ID {update.business_id} not found. Creating new business entry.")
-        if update.data and "name" in update.data and "city" in update.data:
-            try:
-                new_business = Business(
-                    id=update.business_id,
-                    name=update.data.get("name"),
-                    phone=update.data.get("phone"),
-                    email=update.data.get("email"),
-                    description=update.data.get("description"),
-                    city=update.data.get("city"),
-                    status=update.status,
-                    notes=[f"{update.agent_type}: {update.message}"]
-                )
-                app_state["businesses"][update.business_id] = new_business
-            except Exception as e:
-                logger.error(f"Failed to create business from callback data: {e}")
-                return JSONResponse(status_code=400, content={"status": "error", "message": "Invalid business data for creation"})
-        else:
-            logger.warning(f"Cannot create business {update.business_id}: 'data' field in callback is missing or incomplete.")
-            return JSONResponse(status_code=400, content={"status": "error", "message": "Cannot create business from incomplete data"})
+        # Business does NOT exist, attempt to create a new entry with available data
+        logger.info(f"Business ID {update.business_id} not found. Attempting to create new business entry.")
+        data = update.data or {}
+        # Fallback fields from various possible keys
+        name = data.get("name") or data.get("sender_name") or data.get("lead_name")
+        city = data.get("city") or ""
+        phone = data.get("phone") or data.get("lead_phone")
+        email = data.get("email") or data.get("sender_email") or data.get("lead_email")
+        description = (
+            data.get("description") or data.get("subject") or data.get("email_subject") or data.get("body_preview")
+        )
+        if not name:
+            logger.warning(f"Cannot create business {update.business_id}: missing name in callback data.")
+            return JSONResponse(status_code=400, content={"status": "error", "message": "Cannot create business: missing name"})
+        try:
+            new_business = Business(
+                id=update.business_id,
+                name=name,
+                phone=phone,
+                email=email,
+                description=description,
+                city=city,
+                status=update.status,
+                notes=[f"{update.agent_type}: {update.message}"]
+            )
+            app_state["businesses"][update.business_id] = new_business
+        except Exception as e:
+            logger.error(f"Failed to create business from callback data: {e}")
+            return JSONResponse(status_code=400, content={"status": "error", "message": f"Cannot create business: {str(e)}"})
 
-    # Get the final business object to send in the update.
+    # Get the final business object to send in the update
     final_business_obj = app_state["businesses"].get(update.business_id)
-    if final_business_obj:
-        # Store agent update in our list
+    # Handle calendar events: first send a business_updated to move/create the card,
+    # then send a calendar_notification with meeting details
+    if update.agent_type == AgentType.CALENDAR and final_business_obj:
+        # Business_updated event for calendar status
+        biz_payload = {
+            "type": "business_updated",
+            "agent": update.agent_type.value,
+            "business": final_business_obj.model_dump(),
+            "update": update.model_dump(),
+            "timestamp": datetime.now().isoformat(),
+        }
+        await manager.send_update(biz_payload)
+        # Calendar-specific notification
+        cal_payload = {
+            "type": "calendar_notification",
+            "agent": update.agent_type.value,
+            "business_id": update.business_id,
+            "data": update.data,
+            "message": update.message,
+            "timestamp": datetime.now().isoformat(),
+        }
+        await manager.send_update(cal_payload)
+    # Handle other agent updates
+    elif final_business_obj:
+        # Standard business update: store and notify
         app_state["agent_updates"].append(update)
-
-        # Build the JSON-safe payload using .model_dump()
         update_payload = {
             "type": "business_updated",
             "agent": update.agent_type.value,
@@ -839,8 +897,6 @@ async def agent_callback(update: AgentUpdate):
             "update": update.model_dump(),
             "timestamp": datetime.now().isoformat(),
         }
-
-        # Send the payload over the WebSocket
         await manager.send_update(update_payload)
 
     return JSONResponse(status_code=200, content={"status": "success", "message": "Business processed"})

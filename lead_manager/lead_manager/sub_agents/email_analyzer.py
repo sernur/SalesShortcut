@@ -18,30 +18,43 @@ from ..tools.bigquery_utils import check_hot_lead
 from ..config import MODEL # Assuming MODEL is in your config
 from ..prompts import EMAIL_ANALYZER_PROMPT
 from ..tools.meeting_request_llm import is_meeting_request_llm
+from ..callbacks import send_hot_lead_to_ui
 
 logger = logging.getLogger(__name__)
 
 def parse_llm_json_output(raw_data: str) -> dict:
     """
-    Extracts and parses a JSON object from a raw string,
-    which might include markdown code fences.
+    Extracts and parses a JSON object from a raw string, which might include
+    markdown code fences. Includes fallbacks for common syntax errors.
     """
     if not isinstance(raw_data, str):
         if isinstance(raw_data, dict): return raw_data
         raise TypeError(f"Expected a string to parse, but got {type(raw_data)}")
 
+    # Step 1: Extract content from markdown fences if they exist
     match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", raw_data)
     if match:
         json_str = match.group(1)
     else:
         json_str = raw_data
 
+    # Step 2: First attempt to parse the string
     try:
         return json.loads(json_str.strip())
     except json.JSONDecodeError as e:
-        logger.error(f"Failed to decode JSON: {e}")
-        raise ValueError("Could not parse the extracted JSON string.") from e
+        logger.warning(f"Initial JSON parsing failed: {e}. Attempting correction...")
 
+    # Step 3: Fallback 1 - Simple regex to remove trailing commas
+    try:
+        # Remove trailing commas from objects `... ,}` and arrays `... ,]`
+        corrected_str = re.sub(r",\s*([}\]])", r"\1", json_str)
+        logger.info("Attempting to parse again after removing trailing commas.")
+        return json.loads(corrected_str.strip())
+    except json.JSONDecodeError as e2:
+        logger.error(f"Fallback parsing also failed: {e2}")
+        # As a final resort, you could even ask another LLM to fix the JSON,
+        # but for now, we will raise the error.
+        raise ValueError(f"Could not parse the JSON string even after correction attempts.") from e2
 
 class EmailAnalyzer(BaseAgent):
     """
@@ -108,6 +121,13 @@ class EmailAnalyzer(BaseAgent):
                 if await check_hot_lead(sender_email):
                     hot_leads_found += 1
                     logger.info(f"[{self.name}] Hot lead identified: {sender_email}")
+                    
+                    # Send hot lead notification to UI
+                    try:
+                        send_hot_lead_to_ui(email_data)
+                        logger.info(f"[{self.name}] Hot lead notification sent to UI for: {sender_email}")
+                    except Exception as ui_error:
+                        logger.error(f"[{self.name}] Failed to send hot lead notification to UI: {ui_error}")
                     
                     calendar_request_data = await self._is_meeting_request_llm(email_data, ctx)
                     logger.info(f"[{self.name}]✅ LLM analysis result for {sender_email}: {calendar_request_data}")

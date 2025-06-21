@@ -16,6 +16,53 @@ from google.genai import types as genai_types
 
 logger = logging.getLogger(__name__)
 
+def send_hot_lead_to_ui(email_data: Dict[str, Any]):
+    """
+    Sends a hot lead email notification to the UI client's /agent_callback endpoint.
+    Shows unread hot lead emails in the lead-manager-content section.
+    """
+    ui_client_url = os.environ.get(
+        "UI_CLIENT_SERVICE_URL", config.DEFAULT_UI_CLIENT_URL
+    ).rstrip("/")
+    callback_endpoint = f"{ui_client_url}/agent_callback"
+    
+    # Extract email info
+    sender_email = email_data.get("sender_email_address", "") or email_data.get("sender_email", "")
+    subject = email_data.get("subject", "No Subject")
+    body = email_data.get("body", "")
+    
+    # Get first few words from body for preview
+    body_preview = " ".join(body.split()[:15]) + "..." if len(body.split()) > 15 else body
+    
+    payload = {
+        "agent_type": "lead_manager",
+        "business_id": f"hot_lead_{hash(sender_email)}",
+        "status": "found",
+        "message": f"Hot lead email from {sender_email}",
+        "timestamp": datetime.now().isoformat(),
+        "data": {
+            "id": f"hot_lead_{hash(sender_email)}",
+            "sender_email": sender_email,
+            "sender_name": email_data.get("sender_name", sender_email.split('@')[0]),
+            "subject": subject,
+            "body_preview": body_preview,
+            "received_date": email_data.get("date", datetime.now().isoformat()),
+            "message_id": email_data.get("message_id", ""),
+            "type": "hot_lead_email"
+        }
+    }
+
+    logger.info(f"Sending hot lead notification to UI endpoint: {callback_endpoint} for email: {sender_email}")
+    try:
+        with httpx.Client() as client:
+            response = client.post(callback_endpoint, json=payload, timeout=10.0)
+            response.raise_for_status()
+            logger.info(f"Successfully posted hot lead notification to UI. Status: {response.status_code}")
+    except httpx.RequestError as e:
+        logger.error(f"Error sending POST request to UI client at {e.request.url if hasattr(e, 'request') else 'unknown'}: {e}")
+    except Exception as e:
+        logger.error(f"An unexpected error occurred while posting hot lead to UI client: {e}")
+
 def send_meeting_update_to_ui(meeting_data: Dict[str, Any], lead_data: Dict[str, Any]):
     """
     Sends a meeting arrangement update to the UI client's /agent_callback endpoint.
@@ -28,7 +75,7 @@ def send_meeting_update_to_ui(meeting_data: Dict[str, Any], lead_data: Dict[str,
     payload = {
         "agent_type": "lead_manager",
         "business_id": lead_data.get("id", f"lead_{lead_data.get('email', 'unknown')}"),
-        "status": "meeting_arranged",
+        "status": "meeting_scheduled",
         "message": f"Meeting arranged with {lead_data.get('name', 'Unknown')} - {meeting_data.get('title', 'Unknown Meeting')}",
         "timestamp": datetime.now().isoformat(),
         "data": {

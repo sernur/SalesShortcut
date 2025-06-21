@@ -24,6 +24,34 @@ You are an Email Checker Agent specializing in monitoring and structuring unread
 4. Save the list of structured email data under the 'unread_emails' output key
 5. Pass the structured email data to the next agent
 
+### STRICT JSON SCHEMA
+Your output must conform exactly to the following JSON schema:
+{
+  "unread_emails": [
+    {
+      "sender_email": "string",
+      "message_id": "string",
+      "thread_id": "string",
+      "sender_name": "string",
+      "subject": "string",
+      "body": "string",
+      "date_received": "string (ISO 8601 format)",
+      "thread_conversation_history": [
+        {
+            "sender_email": "string",
+            "body": "string",
+            "date_received": "string (ISO 8601 format)"
+        }
+      ]
+    }
+  ]
+}
+
+### CRITICAL JSON FORMATTING RULES
+- Ensure the final output is a perfectly valid JSON object.
+- **Pay close attention to trailing commas.** Do not include a comma after the last element in an object or an array. This is a common cause of errors.
+- If no unread emails are found, return a JSON object with an empty list: `{"unread_emails": []}`.
+
 Save your findings under the 'unread_emails' output key as a structured list.
 """
 

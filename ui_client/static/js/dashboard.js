@@ -123,6 +123,9 @@ class DashboardManager {
             case 'human_input_response_submitted':
                 this.handleHumanInputResponseSubmitted(data);
                 break;
+            case 'calendar_notification':
+                this.handleCalendarNotification(data);
+                break;
             default:
                 console.log('Unknown message type:', data.type);
         }
@@ -308,7 +311,8 @@ class DashboardManager {
         }
         
         const statusText = this.getStatusText(business.status);
-        const statusClass = business.status.replace('_', '-');
+        // For meeting_scheduled status, use 'meeting' class to match CSS
+        const statusClass = isMeeting ? 'meeting' : business.status.replace('_', '-');
         
         // Create compact notes if available
         let compactNotesHtml = '';
@@ -384,7 +388,7 @@ class DashboardManager {
             'not_interested': 'sdr',
             'no_response': 'sdr',
             'converting': 'lead_manager',
-            'meeting_scheduled': 'lead_manager'
+        'meeting_scheduled': 'calendar'
         };
         
         const agentType = statusToAgent[status];
@@ -401,7 +405,7 @@ class DashboardManager {
             'not_interested': 'sdr',
             'no_response': 'sdr',
             'converting': 'lead_manager',
-            'meeting_scheduled': 'lead_manager'
+        'meeting_scheduled': 'calendar'
         };
         
         return statusToAgent[status] || 'unknown';
@@ -476,7 +480,7 @@ class DashboardManager {
     }
     
     updateAgentStatuses(isRunning) {
-        const agents = ['lead-finder', 'sdr', 'lead-manager'];
+        const agents = ['lead-finder', 'sdr', 'lead-manager', 'calendar'];
         agents.forEach(agent => {
             this.updateAgentStatus(agent.replace('-', '_'), isRunning);
         });
@@ -599,9 +603,47 @@ class DashboardManager {
     handleHumanInputResponseSubmitted(data) {
         console.log('Human input response submitted:', data);
         this.addActivityLogEntry('sdr', `Website URL submitted: ${data.response}`, data.timestamp);
-        
         // Close the human input dialog if it's still open
         closeHumanInputDialog();
+    }
+    
+    /**
+     * Handle incoming calendar (meeting) notifications (meeting request stage).
+     * @param {Object} data - Payload with meeting request details
+     */
+    handleCalendarNotification(data) {
+        console.log('Received calendar notification:', data);
+        this.addActivityLogEntry('calendar', data.message, data.timestamp);
+        const container = document.getElementById('meeting-scheduled-content');
+        if (!container) {
+            console.error('Calendar column-content not found (id="meeting-scheduled-content")');
+            return;
+        }
+        const req = data.data || {};
+        const card = document.createElement('div');
+        // Use the same meeting-card style as other business cards
+        card.className = 'business-card compact meeting-card';
+        card.setAttribute('data-business-id', `${data.business_id}-meeting`);
+        const title = req.title || '';
+        const desc = req.description || '';
+        const start = req.start_datetime || '';
+        const end = req.end_datetime || '';
+        const attendees = Array.isArray(req.attendees) ? req.attendees : [];
+        card.innerHTML = `
+            <div class="business-header">
+                <div class="business-title">
+                    <i class="fas fa-handshake meeting-icon"></i>
+                    <h4>${this.escapeHtml(title)}</h4>
+                </div>
+                <span class="status-badge status-meeting-scheduled">Meeting</span>
+            </div>
+            <div class="business-details">
+                ${desc ? `<div class="detail"><i class="fas fa-info-circle"></i><span>${this.escapeHtml(desc)}</span></div>` : ''}
+                <div class="detail"><i class="fas fa-calendar-alt"></i><span>${this.escapeHtml(this.formatDateTime(start))} - ${this.escapeHtml(this.formatDateTime(end))}</span></div>
+                ${attendees.length ? `<div class="detail"><i class="fas fa-users"></i><span>${attendees.map(a => this.escapeHtml(a)).join(', ')}</span></div>` : ''}
+            </div>
+        `;
+        container.appendChild(card);
     }
     
     showSdrDialog(business) {
