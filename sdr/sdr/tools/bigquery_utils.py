@@ -13,7 +13,6 @@ from typing import Dict, Any, List
 from google.adk.tools import FunctionTool
 from google.cloud import bigquery
 from google.cloud.exceptions import NotFound
-from ..config import PROJECT, DATASET_ID, TABLE_ID
 
 logger = logging.getLogger(__name__)
 
@@ -34,44 +33,123 @@ async def sdr_bigquery_upload(
     call_category: Dict[str, Any],
 ) -> dict[str, Any]:
     """
-    BigQuery upload tool for SDR results.
-    
-    Args:
-        business_data: The original business lead data
-        proposal: The generated proposal that was sent to the business owner to discuss on the phone call
-        call_category: The resulted call category from the conversation classifier agent
-        
-    Returns:
-        A dictionary containing upload status
+    Uploads complete SDR interaction data to a dedicated BigQuery table.
+
+    This function now performs a real upload to BigQuery, creating the
+    dataset and table if they don't exist. It also saves a local JSON backup.
     """
-    
-    # Create output file in current directory
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"sdr_bigquery_upload_{timestamp}.json"
-    filepath = Path(filename)
-    
-    # Prepare SDR record for upload
+    project = os.getenv("GOOGLE_CLOUD_PROJECT")
+    # Use SDR-specific dataset and table, not the general env vars
+    dataset_id = "sdr_data"
+    table_id = "sdr_results"
+
+    if not project:
+        logger.error("sdr_bigquery_upload: GOOGLE_CLOUD_PROJECT not configured")
+        return {"status": "error", "message": "GOOGLE_CLOUD_PROJECT not configured"}
+
+    # --- Prepare the record ---
     sdr_record = {
-        "timestamp": datetime.now().isoformat(),
-        "business_data": business_data,
-        "proposal": proposal,
-        "call_category": call_category,
+        "sdr_run_id": str(uuid.uuid4()),
+        "timestamp": datetime.utcnow().isoformat(),
+        "business_name": business_data.get("name"),
+        "business_id": business_data.get("place_id"),
+        "contact_email": call_category.get("email"),
+        "call_category": call_category.get("category"),
+        "proposal_summary": proposal,
+        "full_transcript": call_category.get("summary"),
     }
     
+    # --- Save local backup ---
+    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"sdr_bigquery_upload_{timestamp_str}.json"
+    filepath = Path(filename)
     try:
         await asyncio.to_thread(_write_json_file, filepath, sdr_record)
-        
-        return {
-            "status": "success",
-            "message": f"SDR results uploaded successfully to {filename}",
-            "record": sdr_record,
-            "file_path": str(filepath)
-        }
     except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Error writing SDR data to file: {str(e)}"
-        }
+        logger.error(f"Failed to write local backup file: {e}")
+
+
+    # --- Upload to BigQuery ---
+    try:
+        logger.info(f"Attempting to insert record: {json.dumps(sdr_record, indent=2)}")
+        client = bigquery.Client(project=project)
+        
+        # Ensure dataset exists
+        dataset_ref = client.dataset(dataset_id)
+        try:
+            client.get_dataset(dataset_ref)
+            logger.info(f"Dataset {dataset_id} exists")
+        except NotFound:
+            logger.info(f"Dataset {dataset_id} not found. Creating...")
+            dataset = bigquery.Dataset(dataset_ref)
+            dataset.location = "US"  # You can change this based on your needs
+            dataset = client.create_dataset(dataset, timeout=30)
+            logger.info(f"Created dataset {dataset_id}")
+        
+        table_ref = dataset_ref.table(table_id)
+
+        # Define the complete schema with proper modes
+        target_schema = [
+            bigquery.SchemaField("sdr_run_id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("business_name", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("business_id", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("contact_email", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("call_category", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("proposal_summary", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("full_transcript", "STRING", mode="NULLABLE"),
+        ]
+
+        # Check if table exists and validate schema
+        table_exists = False
+        try:
+            table = client.get_table(table_ref)
+            table_exists = True
+            logger.info(f"Found existing table {table_id}")
+            
+            # Log current schema for debugging
+            current_field_names = [field.name for field in table.schema]
+            logger.info(f"Current table fields: {current_field_names}")
+            
+            # Check if schema matches
+            target_field_names = [field.name for field in target_schema]
+            logger.info(f"Expected fields: {target_field_names}")
+            
+            missing_fields = set(target_field_names) - set(current_field_names)
+            extra_fields = set(current_field_names) - set(target_field_names)
+            
+            if missing_fields:
+                logger.warning(f"Missing fields in table: {missing_fields}")
+                # Add missing fields
+                new_schema = list(table.schema)
+                for field in target_schema:
+                    if field.name in missing_fields:
+                        logger.info(f"Adding field: {field.name}")
+                        new_schema.append(field)
+                table.schema = new_schema
+                table = client.update_table(table, ["schema"])
+                logger.info("Schema updated with missing fields")
+            
+            if extra_fields:
+                logger.warning(f"Extra fields in table (will be ignored): {extra_fields}")
+
+        except NotFound:
+            logger.info(f"Table {table_id} not found. Creating with correct schema...")
+            table = bigquery.Table(table_ref, schema=target_schema)
+            table = client.create_table(table)
+            logger.info(f"Created table {table_id} with schema: {[f.name for f in target_schema]}")
+
+        errors = client.insert_rows_json(table, [sdr_record])
+        if errors:
+            logger.error(f"BigQuery insert errors for SDR data: {errors}")
+            return {"status": "error", "message": f"BigQuery upload failed: {errors}", "backup_file": str(filepath)}
+
+        logger.info(f"Successfully uploaded SDR data for {sdr_record['business_name']}")
+        return {"status": "success", "message": "SDR data uploaded to BigQuery successfully.", "backup_file": str(filepath)}
+
+    except Exception as e:
+        logger.error(f"Error in sdr_bigquery_upload: {e}", exc_info=True)
+        return {"status": "error", "message": str(e), "backup_file": str(filepath)}
 
 
 sdr_bigquery_upload_tool = FunctionTool(func=sdr_bigquery_upload)
@@ -89,19 +167,9 @@ async def bigquery_email_engagement_upload(
 ) -> Dict[str, Any]:
     """
     Upload email engagement data to BigQuery.
-
-    Args:
-        recipient_email: The email address of the recipient.
-        subject: The subject of the email.
-        status: The engagement status (e.g., 'SENT', 'OPENED', 'CLICKED', 'REPLIED').
-        campaign_id: The campaign this email belongs to.
-        notes: Any additional notes.
-
-    Returns:
-        A dictionary containing upload status.
     """
     project = os.getenv("GOOGLE_CLOUD_PROJECT")
-    dataset_id = os.getenv("DATASET_ID", "sdr_data")
+    dataset_id = "sdr_data"
     
     if not project:
         return {"status": "error", "message": "GOOGLE_CLOUD_PROJECT not configured"}
@@ -112,8 +180,9 @@ async def bigquery_email_engagement_upload(
 
         # Ensure table exists with the correct schema
         try:
-            client.get_table(table_ref)
+            table = client.get_table(table_ref)
         except NotFound:
+            logger.info(f"Table {ENGAGEMENT_TABLE_ID} not found. Creating.")
             schema = [
                 bigquery.SchemaField("event_id", "STRING", mode="REQUIRED"),
                 bigquery.SchemaField("recipient_email", "STRING", mode="REQUIRED"),
@@ -128,7 +197,7 @@ async def bigquery_email_engagement_upload(
                 type_=bigquery.TimePartitioningType.DAY,
                 field="timestamp"
             )
-            client.create_table(table)
+            table = client.create_table(table) # Re-assign the returned table object
             logger.info(f"Created BigQuery table: {ENGAGEMENT_TABLE_ID}")
 
         # Prepare data for insertion
@@ -140,10 +209,10 @@ async def bigquery_email_engagement_upload(
             "status": status,
             "campaign_id": campaign_id,
             "notes": notes,
-            "timestamp": now.isoformat() + 'Z',
+            "timestamp": now.isoformat(),
         }
         
-        errors = client.insert_rows_json(table_ref, [row_to_insert])
+        errors = client.insert_rows_json(table, [row_to_insert])
         if errors:
             logger.error(f"BigQuery insertion errors for engagement: {errors}")
             return {"status": "error", "message": f"Failed to insert engagement data: {errors}"}
@@ -152,7 +221,7 @@ async def bigquery_email_engagement_upload(
         return {"status": "success", "message": "Email engagement data uploaded successfully."}
 
     except Exception as e:
-        logger.error(f"Error in bigquery_email_engagement_upload: {e}")
+        logger.error(f"Error in bigquery_email_engagement_upload: {e}", exc_info=True)
         return {"status": "error", "message": str(e)}
 
 # --- NEW: Function Tool for Email Engagement ---
@@ -171,19 +240,9 @@ async def bigquery_accepted_offer_upload(
 ) -> Dict[str, Any]:
     """
     Upload accepted offer data to BigQuery.
-
-    Args:
-        business_name: The name of the business.
-        business_id: The unique ID of the business (e.g., place_id).
-        contact_email: The primary contact email.
-        offer_details: A description of the accepted offer.
-        notes: Any additional notes about the acceptance.
-
-    Returns:
-        A dictionary containing upload status.
     """
     project = os.getenv("GOOGLE_CLOUD_PROJECT")
-    dataset_id = os.getenv("DATASET_ID", "sdr_data")
+    dataset_id = "sdr_data"
     
     if not project:
         return {"status": "error", "message": "GOOGLE_CLOUD_PROJECT not configured"}
@@ -193,8 +252,9 @@ async def bigquery_accepted_offer_upload(
         table_ref = client.dataset(dataset_id).table(ACCEPTED_OFFERS_TABLE_ID)
 
         try:
-            client.get_table(table_ref)
+            table = client.get_table(table_ref)
         except NotFound:
+            logger.info(f"Table {ACCEPTED_OFFERS_TABLE_ID} not found. Creating.")
             schema = [
                 bigquery.SchemaField("acceptance_id", "STRING", mode="REQUIRED"),
                 bigquery.SchemaField("business_name", "STRING", mode="REQUIRED"),
@@ -209,7 +269,7 @@ async def bigquery_accepted_offer_upload(
                 type_=bigquery.TimePartitioningType.DAY,
                 field="timestamp"
             )
-            client.create_table(table)
+            table = client.create_table(table) # Re-assign the returned table object
             logger.info(f"Created BigQuery table: {ACCEPTED_OFFERS_TABLE_ID}")
 
         now = datetime.utcnow()
@@ -220,10 +280,10 @@ async def bigquery_accepted_offer_upload(
             "contact_email": contact_email,
             "offer_details": offer_details,
             "notes": notes,
-            "timestamp": now.isoformat() + 'Z',
+            "timestamp": now.isoformat(),
         }
         
-        errors = client.insert_rows_json(table_ref, [row_to_insert])
+        errors = client.insert_rows_json(table, [row_to_insert])
         if errors:
             logger.error(f"BigQuery insertion errors for accepted offer: {errors}")
             return {"status": "error", "message": f"Failed to insert accepted offer data: {errors}"}
@@ -232,7 +292,7 @@ async def bigquery_accepted_offer_upload(
         return {"status": "success", "message": "Accepted offer data uploaded successfully."}
 
     except Exception as e:
-        logger.error(f"Error in bigquery_accepted_offer_upload: {e}")
+        logger.error(f"Error in bigquery_accepted_offer_upload: {e}", exc_info=True)
         return {"status": "error", "message": str(e)}
 
 # --- NEW: Function Tool for Accepted Offers ---

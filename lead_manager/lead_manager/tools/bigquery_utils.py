@@ -6,10 +6,11 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from google.adk.tools import FunctionTool
 from google.cloud import bigquery
+from google.cloud.exceptions import NotFound
 from ..config import PROJECT, DATASET_ID, TABLE_ID, MEETING_TABLE_ID
 
 logger = logging.getLogger(__name__)
@@ -23,90 +24,65 @@ def _write_json_file(filepath: Path, data: Dict[str, Any]) -> None:
         "data": data
     }
     
+    # Custom JSON encoder to handle datetime objects
+    class DateTimeEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            return super().default(obj)
+    
     with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(output_data, f, indent=2, ensure_ascii=False)
+        json.dump(output_data, f, indent=2, ensure_ascii=False, cls=DateTimeEncoder)
 
-async def check_hot_lead(email_address: str) -> bool:
+async def check_hot_lead(email_address: str) -> Optional[Dict[str, Any]]:
     """
-    Check if an email address is in the hot leads database.
+    Checks if an email address belongs to a hot lead by querying the SDR results table.
+    A hot lead is defined as a lead with a status of 'SUCCESS' or 'NEEDS_FOLLOW_UP'.
     
     Args:
-        email_address: Email address to check
+        email_address: The email address to check.
         
     Returns:
-        bool indicating if the email is a hot lead or not, along with lead data if found.
+        A dictionary containing the lead data if found, otherwise None.
     """
-    
-    # Sleep for 2 sec
-    await asyncio.sleep(2)
-    if email_address.lower() == "meinnps@gmail.com":
-        logger.info(f"✅ {email_address} is a hot lead (mocked for testing)")
-        return True
-    else:
-        return False
-    # try:
-    #     logger.info(f"🔍 Checking if {email_address} is a hot lead...")
+    try:
+        logger.info(f"🔍 Checking if {email_address} is a hot lead...")
         
-    #     # Initialize BigQuery client
-    #     client = bigquery.Client(project=PROJECT)
+        client = bigquery.Client(project=PROJECT)
         
-    #     # Query to check if email exists in hot leads table
-    #     query = f"""
-    #     SELECT 
-    #         *
-    #     FROM `{PROJECT}.{DATASET_ID}.{TABLE_ID}`
-    #     WHERE LOWER(email) = LOWER(@email_address)
-    #     LIMIT 1
-    #     """
+        # Correctly query the sdr_results table from the sdr_data dataset
+        sdr_dataset_id = "sdr_data"
+        sdr_table_id = "sdr_results"
         
-    #     # Configure query parameters
-    #     job_config = bigquery.QueryJobConfig(
-    #         query_parameters=[
-    #             bigquery.ScalarQueryParameter("email_address", "STRING", email_address),
-    #         ]
-    #     )
+        query = f"""
+            SELECT *
+            FROM `{PROJECT}.{sdr_dataset_id}.{sdr_table_id}`
+            WHERE LOWER(contact_email) = LOWER(@email_address)
+              AND call_category IN ('SUCCESS', 'NEEDS_FOLLOW_UP')
+            ORDER BY timestamp DESC
+            LIMIT 1
+        """
         
-    #     # Execute query
-    #     query_job = client.query(query, job_config=job_config)
-    #     results = list(query_job)
+        job_config = bigquery.QueryJobConfig(
+            query_parameters=[
+                bigquery.ScalarQueryParameter("email_address", "STRING", email_address),
+            ]
+        )
         
-    #     if not results:
-    #         logger.info(f"❌ {email_address} is not a hot lead")
-    #         return {
-    #             "success": True,
-    #             "is_hot_lead": False,
-    #             "email": email_address,
-    #             "lead_data": None,
-    #             "message": f"{email_address} is not found in hot leads database"
-    #         }
+        query_job = client.query(query, job_config=job_config)
+        results = list(query_job)
         
-    #     # Convert BigQuery row to dictionary
-    #     lead_data = dict(results[0])
+        if not results:
+            logger.info(f"❌ {email_address} is not a hot lead.")
+            return None
         
-    #     # Convert any datetime objects to strings for JSON serialization
-    #     for key, value in lead_data.items():
-    #         if isinstance(value, datetime):
-    #             lead_data[key] = value.isoformat()
+        lead_data = dict(results[0])
+        logger.info(f"✅ Found hot lead: {email_address}")
+        return lead_data
         
-    #     logger.info(f"✅ {email_address} is a hot lead!")
-    #     return {
-    #         "success": True,
-    #         "is_hot_lead": True,
-    #         "email": email_address,
-    #         "lead_data": lead_data,
-    #         "message": f"{email_address} found in hot leads database"
-    #     }
-        
-    # except Exception as e:
-    #     logger.error(f"❌ Error checking hot lead: {e}")
-    #     return {
-    #         "success": False,
-    #         "is_hot_lead": False,
-    #         "email": email_address,
-    #         "lead_data": None,
-    #         "error": str(e),
-    #         "message": f"Error checking hot lead status: {str(e)}"
-    #     }
+    except Exception as e:
+        logger.error(f"❌ Error checking hot lead status for {email_address}: {e}")
+        return None
 
 async def save_meeting_arrangement(
     lead_data: Dict[str, Any],
@@ -158,15 +134,62 @@ async def save_meeting_arrangement(
             "full_meeting_data": meeting_data,
             "full_email_data": email_data
         }
-        _write_json_file(filepath, backup_data)
+        await asyncio.to_thread(_write_json_file, filepath, backup_data)
         
         # Initialize BigQuery client
         client = bigquery.Client(project=PROJECT)
         
-        # Get table reference
-        table_id = f"{PROJECT}.{DATASET_ID}.{MEETING_TABLE_ID}"
-        table = client.get_table(table_id)
-        
+        # Get table reference and ensure it exists
+        table_ref = client.dataset(DATASET_ID).table(MEETING_TABLE_ID)
+
+        # Define target schema
+        target_schema = [
+            bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
+            bigquery.SchemaField("lead_email", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("lead_name", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("lead_company", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("lead_phone", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("meeting_id", "STRING", mode="REQUIRED"),
+            bigquery.SchemaField("meeting_title", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("meeting_date", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("meeting_link", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("meeting_duration", "INTEGER", mode="NULLABLE"),
+            bigquery.SchemaField("original_email_subject", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("original_email_date", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("original_message_id", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("status", "STRING", mode="NULLABLE"),
+            bigquery.SchemaField("agent_type", "STRING", mode="NULLABLE"),
+        ]
+
+        try:
+            table = client.get_table(table_ref)
+            logger.info(f"Found existing table {MEETING_TABLE_ID}")
+            
+            # Check for missing fields
+            current_field_names = {field.name for field in table.schema}
+            target_field_names = {field.name for field in target_schema}
+            missing_fields = target_field_names - current_field_names
+            
+            if missing_fields:
+                logger.info(f"Adding missing fields to table: {missing_fields}")
+                new_schema = list(table.schema)
+                for field in target_schema:
+                    if field.name in missing_fields:
+                        new_schema.append(field)
+                table.schema = new_schema
+                table = client.update_table(table, ["schema"])
+                logger.info("Schema updated successfully")
+                
+        except NotFound:
+            logger.info(f"Table {MEETING_TABLE_ID} not found. Creating table...")
+            table = bigquery.Table(table_ref, schema=target_schema)
+            table.time_partitioning = bigquery.TimePartitioning(
+                type_=bigquery.TimePartitioningType.DAY,
+                field="timestamp"
+            )
+            client.create_table(table)
+            logger.info(f"✅ Table {MEETING_TABLE_ID} created.")
+
         # Insert row
         rows_to_insert = [meeting_record]
         errors = client.insert_rows_json(table, rows_to_insert)
