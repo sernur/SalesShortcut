@@ -1,0 +1,26 @@
+{
+  "timestamp": "2025-06-21T17:56:19.893750",
+  "data": {
+    "full_meeting_data": {
+      "title": "Meeting with Merdan Durdyev",
+      "start_datetime": "2025-06-25T09:00:00-06:00",
+      "end_datetime": "2025-06-25T10:00:00-06:00",
+      "description": "Merdan proposed a meeting on June 25 at 09:00 AM.",
+      "attendees": [
+        "meinnps@gmail.com",
+        "sales@zemzen.org"
+      ],
+      "status": "meeting_request"
+    },
+    "full_email_data": {
+      "sender_name": "Merdan Durdyev",
+      "date_received": "2025-06-21T17:54:57-06:00",
+      "sender_email": "meinnps@gmail.com",
+      "body": "Good! Let's do it on June 25, 09:00 AM\r\n\r\nOn Sat, Jun 21, 2025 at 5:53 PM <sales@zemzen.org> wrote:\r\n\r\n> Hi there,\r\n>\r\n> It was a pleasure speaking with you earlier today!\r\n>\r\n> As promised, here’s a proposal tailored for Le Croissant. We\r\n> understand your commitment to offering the Logan community exceptional\r\n> artisan breads, pastries, and delicious lunch options, including your\r\n> well-regarded vegan choices. Our aim is to help you stand out in the\r\n> competitive market.\r\n>\r\n> Please take a look at the attached proposal for a detailed overview of\r\n> how we can help Le Croissant achieve its goals.\r\n>\r\n> I’m also excited to share a preview of the demo website, created just\r\n> for you! You can view it here:\r\n>\r\n> https://6000-firebase-studio-1750537617452.cluster-2xfkbshw5rfguuk5qupw267afs.cloudworkstations.dev/\r\n>\r\n> To move forward, what time works best for you for a quick chat next\r\n> week to discuss? Or if you are happy with the prototype, just reply to\r\n> this email, and we can send you the contract.\r\n>\r\n> Looking forward to your response!\r\n>\r\n> Best regards,\r\n>\r\n> Lexi\r\n> ZemZen\r\n> sales@zemzen.org",
+      "thread_id": "19794e97c9da2cce",
+      "subject": "Re: Follow-up on Our Recent Call - Proposal for Le Croissant in Logan",
+      "thread_conversation_history": [],
+      "message_id": "19794eb41af26793"
+    }
+  }
+}

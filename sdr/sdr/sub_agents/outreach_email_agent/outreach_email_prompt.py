@@ -144,23 +144,23 @@ EMAIL_SENDER_AGENT_PROMPT = """
    Offer file path: {offer_file_path}
 
    ### AVAILABLE TOOLS
-   1. **send_email_with_attachment**: Send email with optional attachment - send_email_with_attachment(to_email, subject, body, attachment_path)
+   1. **send_email_tool**: Send email with optional attachment - send_email_tool(to_email, subject, body, attachment_path)
 
    ### CRITICAL INSTRUCTIONS
-   You MUST use the send_email_with_attachment tool to actually send the email. Do not just describe what you would do - CALL THE TOOL.
+   You MUST use the send_email_tool tool to actually send the email. Do not just describe what you would do - CALL THE TOOL.
 
    ### INSTRUCTIONS
    1. Extract the email details from the "Email data:" section above (it contains to, subject, body, attachment fields).
    2. Extract the file path from the "Offer file path:" section above.
-   3. IMMEDIATELY call the `send_email_with_attachment` tool with these extracted values.
+   3. IMMEDIATELY call the `send_email_tool` tool with these extracted values.
    4. Use the actual values from the data provided above, not placeholder text.
    5. If the offer file path is empty or null, pass None for attachment_path.
    6. The service account will automatically send from sales@zemzen.org - no manual authentication needed.
 
    ### EXAMPLE USAGE
-   You must call the send_email_with_attachment function like this:
+   You must call the send_email_tool function like this:
    ```
-   send_email_with_attachment(
+   send_email_tool(
        to_email="recipient@example.com",  # Use the 'to' field from crafted_email data above
        subject="Email Subject",           # Use the 'subject' field from crafted_email data above
        body="Email body content",         # Use the 'body' field from crafted_email data above
@@ -170,11 +170,11 @@ EMAIL_SENDER_AGENT_PROMPT = """
 
    ### IMPORTANT
    - DO NOT just return a JSON response without calling the tool
-   - ALWAYS call the send_email_with_attachment function first
+   - ALWAYS call the send_email_tool function first
    - Return the result from the tool call
 
    ### OUTPUT
-   After calling the send_email_with_attachment tool, provide the email sending result in the following format:
+   After calling the send_email_tool tool, provide the email sending result in the following format:
    ```json
    {
    "status": "success" | "failed",

@@ -47,6 +47,10 @@ def send_sdr_update_to_ui(business_data: dict, email_sent_result: Optional[dict]
 
     # Create a copy of the business_data to modify it for UI client's validation
     data_for_ui = business_data.copy()
+    
+    # log data structures 
+    logger.debug(f"SDR [Callback] Data for UI: {data_for_ui}")
+    logger.debug(f"SDR [Callback] Email sent result: {email_sent_result}")
 
     # Ensure 'city' is a top-level field for UI client's AgentUpdate validation
     if 'city' not in data_for_ui and 'address' in data_for_ui:
@@ -57,12 +61,43 @@ def send_sdr_update_to_ui(business_data: dict, email_sent_result: Optional[dict]
             logger.warning(f"Could not extract city from address: {data_for_ui.get('address')}. Business may not be created in UI.")
 
     email_sent_result_for_ui = email_sent_result if email_sent_result else {}
-    crafted = email_sent_result_for_ui.get("crafted_email", {})
-    email = crafted.get("email")
+    
+    # FIX: Parse the crafted_email if it's a JSON string
+    crafted_email_raw = email_sent_result_for_ui.get("crafted_email", {})
+    
+    # Helper function to safely parse a string that might be markdown-wrapped JSON
+    def safe_json_parse(value: any, key_name: str) -> any:
+        if not isinstance(value, str):
+            return value # It's already an object, return as-is
+
+        cleaned_str = value.strip()
+        match = re.search(r"```json\s*([\s\S]*?)\s*```", cleaned_str)
+        if match:
+            cleaned_str = match.group(1)
+        
+        try:
+            return json.loads(cleaned_str)
+        except json.JSONDecodeError:
+            logger.warning(f"SDR [Callback] Could not parse '{key_name}' as JSON. Using raw string value.")
+            return value # Return the original string if parsing fails
+    
+    # Parse the crafted_email if it's a string
+    crafted = safe_json_parse(crafted_email_raw, 'crafted_email')
+    
+    # Now safely extract email information
+    email = None
+    email_subject = None
+    body_preview = ""
+    
+    if isinstance(crafted, dict):
+        email = crafted.get("to")
+        email_subject = crafted.get("subject")
+        body_preview = crafted.get("body", "").strip()[:50]
+    else:
+        logger.warning(f"SDR [Callback] crafted_email could not be parsed as dict: {type(crafted)}")
+    
     if email:
         data_for_ui['email'] = email
-    email_subject = crafted.get("subject")
-    body_preview = crafted.get("body", "").strip()[:50]
 
     # Build the UI update payload
     # Include the recipient email in the message so the CONTACTED card shows it
@@ -130,10 +165,25 @@ async def post_results_callback(callback_context: CallbackContext) -> Optional[g
         logger.warning(f"SDR [Callback] No business data found in state for agent: {agent_name}")
         return None
 
+    # UPDATED: Try to get email_sent_result first, then fall back to crafted_email
     email_sent_result = safe_json_parse(context_state.get('email_sent_result'), 'no_email_sent_result')
-    if email_sent_result is None and 'no_email_sent_result' in context_state:
-        logger.warning(f"SDR [Callback] No email sent result found in state for agent: {agent_name}")
-        return None
+    
+    # If email_sent_result doesn't exist, try to construct it from crafted_email
+    if email_sent_result is None:
+        crafted_email = safe_json_parse(context_state.get('crafted_email'), 'no_crafted_email')
+        if crafted_email:
+            # Create the expected structure
+            email_sent_result = {
+                'email_sent_result': {
+                    'status': 'success',
+                    'message': 'Email sent successfully',
+                    'crafted_email': crafted_email
+                }
+            }
+            logger.info("SDR [Callback] Constructed email_sent_result from crafted_email")
+        else:
+            logger.warning(f"SDR [Callback] No email data found in state for agent: {agent_name}")
+            return None
     
     logger.info(f"SDR [Callback] Business data and email sent result parsed successfully.")
     
@@ -157,8 +207,6 @@ async def post_results_callback(callback_context: CallbackContext) -> Optional[g
 
     logger.info("SDR [Callback] UI updates sent. Callback finished.")
     return None
-
-
 
 def validate_us_phone_number(phone_number: str) -> Dict[str, Any]:
     """

@@ -89,7 +89,7 @@ def create_service_account_credentials():
         raise
 
 
-def send_email_with_attachment(to_email: str, subject: str, body: str, attachment_path: Optional[str] = None) -> dict[str, Any]:
+def send_email(to_email: str, subject: str, body: str, attachment_path: Optional[str] = None) -> dict[str, Any]:
     """
     Send email from sales account with optional attachment using service account.
     
@@ -221,4 +221,4 @@ def send_email_with_attachment(to_email: str, subject: str, body: str, attachmen
         }
 
 
-send_email = FunctionTool(func=send_email_with_attachment)
+send_email_tool = FunctionTool(func=send_email)
