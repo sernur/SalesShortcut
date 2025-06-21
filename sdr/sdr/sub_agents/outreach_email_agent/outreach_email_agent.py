@@ -15,8 +15,8 @@ outreach_email_agent = SequentialAgent(
     description="Sequential agent that creates commercial specifications, demo websites, sends emails, and saves engagement data",
     sub_agents=[
         specification_creator_agent,
-        offer_file_creator_agent,
         website_creator_agent,
+        offer_file_creator_agent,
         email_agent,
         engagement_saver_agent
     ],

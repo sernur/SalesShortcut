@@ -165,7 +165,7 @@ class BigQueryClient:
         
         return cleaned
 
-    async def upload_businesses(self, businesses: List[Dict[str, Any]], city: str, search_type: str = None) -> Dict[str, Any]:
+    async def upload_businesses(self, businesses: List[Dict[str, Any]], city: str, search_type: Optional[str] = None) -> Dict[str, Any]:
         """
         Upload business data to BigQuery with deduplication.
         
@@ -359,7 +359,7 @@ class BigQueryClient:
             logger.error(f"Error querying businesses: {e}")
             return {"status": "error", "message": str(e)}
 
-    async def _mock_upload(self, businesses: List[Dict[str, Any]], city: str, search_type: str = None) -> Dict[str, Any]:
+    async def _mock_upload(self, businesses: List[Dict[str, Any]], city: str, search_type: Optional[str] = None) -> Dict[str, Any]:
         """Mock upload for when BigQuery is not available."""
         logger.info(f"Mock BigQuery upload: {len(businesses)} businesses for {city}")
         

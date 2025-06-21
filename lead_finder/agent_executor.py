@@ -11,6 +11,7 @@ from a2a.types import DataPart, Part, TaskState
 from common.config import DEFAULT_LEAD_FINDER_ARTIFACT_NAME, DEFAULT_UI_CLIENT_URL
 from google.adk import Runner
 from google.adk.sessions import InMemorySessionService, Session
+from google.adk.artifacts import InMemoryArtifactService
 from google.genai import types as genai_types
 
 from .lead_finder.agent import lead_finder_agent
@@ -26,6 +27,7 @@ class LeadFinderAgentExecutor(AgentExecutor):
         self._adk_runner = Runner(
             app_name="lead_finder_adk_runner",
             agent=self._adk_agent,
+            artifact_service=InMemoryArtifactService(),
             session_service=InMemorySessionService(),
         )
         logger.info("LeadFinderAgentExecutor initialized with ADK Runner.")

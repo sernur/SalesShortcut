@@ -73,7 +73,7 @@ class HumanInteractionManager:
     def mark_session_inactive(self, session_id: str):
         self._active_sessions.discard(session_id)
 
-async def send_ui_notification(request_id: str, prompt: str, ui_endpoint: str = None, max_retries: int = 3) -> bool:
+async def send_ui_notification(request_id: str, prompt: str, ui_endpoint: Optional[str] = None, max_retries: int = 3) -> bool:
     """Send notification to UI via REST API with retry logic"""
     if ui_endpoint is None:
         ui_endpoint = DEFAULT_UI_CLIENT_URL

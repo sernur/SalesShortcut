@@ -40,6 +40,12 @@ python -m sdr &
 SDR_PID=$!
 echo "SDR started with PID: $SDR_PID"
 
+# Start Gmail Pub/Sub Listener (Port: 8083)
+echo "Starting Gmail Pub/Sub Listener service in the background..."
+GOOGLE_API_KEY="$GOOGLE_API_KEY" python -m gmail_pubsub_listener.gmail_listener_service &
+GMAIL_LISTENER_PID=$!
+echo "Gmail Listener started with PID: $GMAIL_LISTENER_PID"
+
 # Start UI Client (Default Port: 8000)
 echo "Starting UI Client service in the background..."
 python -m ui_client &
@@ -51,9 +57,10 @@ echo "Local services started:"
 echo "  Lead Finder:        http://127.0.0.1:8081 (PID: $LEAD_FINDER_PID)"
 echo "  Lead Manager:       http://127.0.0.1:8082 (PID: $LEAD_MANAGER_PID)"
 echo "  SDR:                http://127.0.0.1:8084 (PID: $SDR_PID)"
+echo "  Gmail Listener:     http://127.0.0.1:8083 (PID: $GMAIL_LISTENER_PID)"
 echo "  UI Client:          http://127.0.0.1:8000 (PID: $UI_CLIENT_PID)"
 echo "--------------------------------------------------"
-echo "Use 'kill $LEAD_FINDER_PID $LEAD_MANAGER_PID $SDR_PID $UI_CLIENT_PID' or Ctrl+C to stop all services."
+echo "Use 'kill $LEAD_FINDER_PID $LEAD_MANAGER_PID $SDR_PID $GMAIL_LISTENER_PID $UI_CLIENT_PID' or Ctrl+C to stop all services."
 
 # Optional: Wait for all background processes to finish (uncomment if needed)
 # wait
