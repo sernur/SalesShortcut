@@ -108,7 +108,7 @@ print(result)
 python -c "
 import asyncio
 from lead_manager.lead_manager.tools.check_email import mark_email_as_read
-result = asyncio.run(mark_email_as_read('1978fa308ab4b4c6'))
+result = asyncio.run(mark_email_as_read('19793c88c8a6afad'))
 print(result)
 "
 ```

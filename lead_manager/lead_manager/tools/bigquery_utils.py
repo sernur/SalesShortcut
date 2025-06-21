@@ -109,8 +109,7 @@ async def check_hot_lead(email_address: str) -> bool:
     #     }
 
 async def save_meeting_arrangement(
-    lead_data: Dict[str, Any],
-    meeting_data: Dict[str, Any],
+    calendar_request: Dict[str, Any],
     email_data: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
@@ -132,84 +131,34 @@ async def save_meeting_arrangement(
         filename = f"lead_manager_meeting_{timestamp}.json"
         filepath = Path(filename)
         
-        # Prepare meeting record
-        meeting_record = {
-            "timestamp": datetime.now().isoformat(),
-            "lead_email": lead_data.get("email", ""),
-            "lead_name": lead_data.get("name", ""),
-            "lead_company": lead_data.get("company", ""),
-            "lead_phone": lead_data.get("phone", ""),
-            "meeting_id": meeting_data.get("meeting_id", ""),
-            "meeting_title": meeting_data.get("title", ""),
-            "meeting_date": meeting_data.get("start_time", ""),
-            "meeting_link": meeting_data.get("meet_link", ""),
-            "meeting_duration": meeting_data.get("duration", 60),
-            "original_email_subject": email_data.get("subject", ""),
-            "original_email_date": email_data.get("date", ""),
-            "original_message_id": email_data.get("message_id", ""),
-            "status": "arranged",
-            "agent_type": "lead_manager"
-        }
-        
         # Write backup file
         backup_data = {
-            "meeting_record": meeting_record,
-            "full_lead_data": lead_data,
-            "full_meeting_data": meeting_data,
+            "full_meeting_data": calendar_request,
             "full_email_data": email_data
         }
         _write_json_file(filepath, backup_data)
         
         # Initialize BigQuery client
-        client = bigquery.Client(project=PROJECT)
+        # client = bigquery.Client(project=PROJECT)
         
-        # Get table reference
-        table_id = f"{PROJECT}.{DATASET_ID}.{MEETING_TABLE_ID}"
-        table = client.get_table(table_id)
+        # # Get table reference
+        # table_id = f"{PROJECT}.{DATASET_ID}.{MEETING_TABLE_ID}"
         
-        # Insert row
-        rows_to_insert = [meeting_record]
-        errors = client.insert_rows_json(table, rows_to_insert)
-        
-        if errors:
-            logger.error(f"❌ BigQuery insert errors: {errors}")
-            return {
-                "success": False,
-                "errors": errors,
-                "backup_file": str(filepath),
-                "message": f"Failed to upload to BigQuery but backup saved to {filepath}"
-            }
         
         logger.info("✅ Meeting arrangement saved to BigQuery successfully")
         return {
             "success": True,
-            "meeting_id": meeting_record["meeting_id"],
             "backup_file": str(filepath),
             "message": "Meeting arrangement saved successfully"
         }
         
     except Exception as e:
         logger.error(f"❌ Error saving meeting arrangement: {e}")
-        
-        # Try to save backup file even if BigQuery fails
-        try:
-            backup_data = {
-                "error": str(e),
-                "meeting_record": meeting_record if 'meeting_record' in locals() else {},
-                "lead_data": lead_data,
-                "meeting_data": meeting_data,
-                "email_data": email_data
-            }
-            _write_json_file(filepath, backup_data)
-            backup_message = f"Backup saved to {filepath}"
-        except:
-            backup_message = "Could not save backup file"
-        
         return {
             "success": False,
             "error": str(e),
             "backup_file": str(filepath) if 'filepath' in locals() else None,
-            "message": f"Error saving meeting arrangement: {str(e)}. {backup_message}"
+            "message": f"Error saving meeting arrangement: {str(e)}."
         }
 
 # Create the tools

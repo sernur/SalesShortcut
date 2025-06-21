@@ -16,6 +16,37 @@ from google.genai import types as genai_types
 
 logger = logging.getLogger(__name__)
 
+
+def send_calendar_notification_to_ui(calendar_request: Dict[str, Any]) -> None:
+    """
+    Sends a calendar notification to the UI client's /agent_callback endpoint.
+    Shows unread calendar requests in the lead-manager-content section.
+    """
+    ui_client_url = os.environ.get(
+        "UI_CLIENT_SERVICE_URL", config.DEFAULT_UI_CLIENT_URL
+    ).rstrip("/")
+    callback_endpoint = f"{ui_client_url}/agent_callback"
+    
+    payload = {
+        "agent_type": "calendar",
+        "business_id": calendar_request.get("business_id", "unknown_business"),
+        "status": "meeting_scheduled",
+        "message": f"Incoming meeting with {calendar_request.get('sender_email', 'unknown')}",
+        "timestamp": datetime.now().isoformat(),
+        "data": calendar_request
+    }
+    
+    logger.info(f"Sending calendar notification to UI endpoint: {callback_endpoint}")
+    try:
+        with httpx.Client() as client:
+            response = client.post(callback_endpoint, json=payload, timeout=10.0)
+            response.raise_for_status()
+            logger.info(f"Successfully posted calendar notification to UI. Status: {response.status_code}")
+    except httpx.RequestError as e:
+        logger.error(f"Error sending POST request to UI client at {e.request.url if hasattr(e, 'request') else 'unknown'}: {e}")
+    except Exception as e:
+        logger.error(f"An unexpected error occurred while posting calendar notification to UI client: {e}")
+
 def send_hot_lead_to_ui(email_data: Dict[str, Any]):
     """
     Sends a hot lead email notification to the UI client's /agent_callback endpoint.
@@ -37,11 +68,10 @@ def send_hot_lead_to_ui(email_data: Dict[str, Any]):
     payload = {
         "agent_type": "lead_manager",
         "business_id": f"hot_lead_{hash(sender_email)}",
-        "status": "found",
+        "status": "converting",
         "message": f"Hot lead email from {sender_email}",
         "timestamp": datetime.now().isoformat(),
         "data": {
-            "id": f"hot_lead_{hash(sender_email)}",
             "sender_email": sender_email,
             "sender_name": email_data.get("sender_name", sender_email.split('@')[0]),
             "subject": subject,
@@ -63,54 +93,6 @@ def send_hot_lead_to_ui(email_data: Dict[str, Any]):
     except Exception as e:
         logger.error(f"An unexpected error occurred while posting hot lead to UI client: {e}")
 
-def send_meeting_update_to_ui(meeting_data: Dict[str, Any], lead_data: Dict[str, Any]):
-    """
-    Sends a meeting arrangement update to the UI client's /agent_callback endpoint.
-    """
-    ui_client_url = os.environ.get(
-        "UI_CLIENT_SERVICE_URL", config.DEFAULT_UI_CLIENT_URL
-    ).rstrip("/")
-    callback_endpoint = f"{ui_client_url}/agent_callback"
-
-    payload = {
-        "agent_type": "lead_manager",
-        "business_id": lead_data.get("id", f"lead_{lead_data.get('email', 'unknown')}"),
-        "status": "meeting_scheduled",
-        "message": f"Meeting arranged with {lead_data.get('name', 'Unknown')} - {meeting_data.get('title', 'Unknown Meeting')}",
-        "timestamp": datetime.now().isoformat(),
-        "data": {
-            # Lead information
-            "lead_name": lead_data.get("name", "Unknown"),
-            "lead_email": lead_data.get("email", ""),
-            "lead_company": lead_data.get("company", ""),
-            "lead_phone": lead_data.get("phone", ""),
-            
-            # Meeting information  
-            "meeting_id": meeting_data.get("meeting_id", ""),
-            "meeting_title": meeting_data.get("title", ""),
-            "meeting_start": meeting_data.get("start_time", ""),
-            "meeting_end": meeting_data.get("end_time", ""),
-            "meeting_duration": meeting_data.get("duration", 60),
-            "meeting_link": meeting_data.get("meet_link", ""),
-            "calendar_link": meeting_data.get("calendar_link", ""),
-            
-            # Metadata
-            "agent_action": "meeting_arranged",
-            "processing_timestamp": datetime.now().isoformat()
-        }
-    }
-
-    logger.info(f"Sending POST to UI endpoint: {callback_endpoint} for meeting: {meeting_data.get('title', 'Unknown')}")
-    try:
-        with httpx.Client() as client:
-            response = client.post(callback_endpoint, json=payload, timeout=10.0)
-            response.raise_for_status()
-            logger.info(f"Successfully posted meeting update to UI. Status: {response.status_code}")
-    except httpx.RequestError as e:
-        logger.error(f"Error sending POST request to UI client at {e.request.url if hasattr(e, 'request') else 'unknown'}: {e}")
-    except Exception as e:
-        logger.error(f"An unexpected error occurred while posting to the UI client: {e}")
-
 async def post_lead_manager_callback(callback_context: CallbackContext) -> Optional[genai_types.Content]:
     """
     Callback function for Lead Manager Agent completion.
@@ -121,17 +103,13 @@ async def post_lead_manager_callback(callback_context: CallbackContext) -> Optio
 
     context_state = callback_context.state.to_dict()
     logger.info(f"[Callback] Current callback_context.state: {context_state}")
-
-    # ====================================================================
-    # --- FIX: Robustly parse all potential JSON strings from the state ---
-    # ====================================================================
     
     # Helper function to safely parse a string that might be markdown-wrapped JSON
     def safe_json_parse(value: any, key_name: str) -> any:
         if not isinstance(value, str):
             return value # It's already an object, return as-is
-        
-        cleaned_str = value
+
+        cleaned_str = value.strip()
         match = re.search(r"```json\s*([\s\S]*?)\s*```", cleaned_str)
         if match:
             cleaned_str = match.group(1)
@@ -142,43 +120,25 @@ async def post_lead_manager_callback(callback_context: CallbackContext) -> Optio
             logger.warning(f"[Callback] Could not parse '{key_name}' as JSON. Using raw string value.")
             return value # Return the original string if parsing fails
 
-    notification_data = safe_json_parse(context_state.get('notification_result'), 'notification_result')
-    meeting_data = safe_json_parse(context_state.get('meeting_result'), 'meeting_result')
-    hot_lead_data = safe_json_parse(context_state.get('hot_lead_email'), 'hot_lead_email')
+    notification_data = safe_json_parse(context_state.get('calendar_request'), 'notification_result')
+    
+    if notification_data is None and 'notification_result' in context_state:
+        logger.warning(f"[Callback] No notification data found in state for agent: {agent_name}")
+        return None
 
-    # ====================================================================
-    # --- Logic now uses the cleaned and parsed data objects ---
-    # ====================================================================
-
-    if notification_data and notification_data != "no_action_needed":
-        logger.info("[Callback] Meeting arrangement results found in state.")
-        
-        # The data is already parsed, now we just use it.
-        # This block can be simplified or enhanced to send specific UI updates.
-        if isinstance(meeting_data, dict) and isinstance(hot_lead_data, dict):
-            lead_data_details = hot_lead_data.get("lead_data", {})
-            logger.info(f"Processing results for lead: {lead_data_details.get('name', 'N/A')}")
-            # Example of sending a structured update
-            # send_meeting_update_to_ui(meeting_data, lead_data_details)
-        else:
-            logger.info("Proceeding with general notification.")
-
-    elif context_state.get('hot_lead_email') == "no_action_needed":
-        logger.info("[Callback] No hot lead meeting requests found - no action needed.")
-    else:
-        logger.warning("[Callback] No meeting arrangement results found in state.")
-
+    send_calendar_notification_to_ui(notification_data)
+    
     try:
-        # Save the parsed Python objects, not the raw strings
-        await callback_context.save_artifact("lead_manager_results", {
-            "notification_result": notification_data,
-            "meeting_result": meeting_data,
-            "hot_lead_email": hot_lead_data,
+        # Saving artifacts
+        # This part is still subject to the "Artifact service is not initialized" error
+        # but it should not block UI updates now.
+        await callback_context.save_artifact("final_notification_results", {
+            "notification_data": notification_data,
             "timestamp": datetime.now().isoformat()
         })
-        logger.info("[Callback] Saved artifact for lead manager completion.")
+        logger.info(f"[Callback] Saved artifact with notification data for task completion.")
     except Exception as e:
         logger.error(f"[Callback] Error saving final artifact: {e}")
 
-    logger.info("[Callback] Lead Manager callback finished.")
+    logger.info("[Callback] UI updates sent. Callback finished.")
     return None

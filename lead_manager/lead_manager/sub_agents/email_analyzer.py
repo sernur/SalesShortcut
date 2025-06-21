@@ -5,7 +5,7 @@ Fixed version with robust JSON parsing, updated imports, and complete Event obje
 import json
 import logging
 import re
-from typing import AsyncGenerator, Dict, Any
+from typing import AsyncGenerator, Dict, Any, Optional
 from typing_extensions import override
 
 # --- FIX 1, PART A: Move imports to the top of the file ---
@@ -61,15 +61,31 @@ class EmailAnalyzer(BaseAgent):
     A custom agent that analyzes emails to identify hot leads with meeting requests.
     """
     calendar_organizer_agent: BaseAgent
+    output_key: Optional[str] = None  # Add as class field
     model_config = {"arbitrary_types_allowed": True}
 
-    def __init__(self, name: str, calendar_organizer_agent: BaseAgent):
+    def __init__(self, name: str, calendar_organizer_agent: BaseAgent, output_key: str = None):
         sub_agents_list = [calendar_organizer_agent]
         super().__init__(
             name=name,
             calendar_organizer_agent=calendar_organizer_agent,
-            sub_agents=sub_agents_list
+            sub_agents=sub_agents_list,
         )
+        self.output_key = output_key  # Store the output_key
+
+    def __maybe_save_output_to_state(self, event: Event):
+        """Saves the agent output to state if needed."""
+        if (
+            self.output_key
+            and event.is_final_response()
+            and event.content
+            and event.content.parts
+        ):
+            result = ''.join(
+                [part.text if part.text else '' for part in event.content.parts]
+            )
+            # Save to state using the event's actions
+            event.actions.state_delta[self.output_key] = result
 
     async def _is_meeting_request_llm(self, email_data: Dict[str, Any], ctx: InvocationContext) -> dict:
         """Delegate meeting request analysis to the shared tool."""
@@ -84,7 +100,9 @@ class EmailAnalyzer(BaseAgent):
 
         if not unread_emails_data:
             logger.info(f"[{self.name}] No unread emails data found in session state.")
-            yield Event(content=types.Content(parts=[types.Part(text="No unread emails data found.")]), author=self.name)
+            event = Event(content=types.Content(parts=[types.Part(text="No unread emails data found.")]), author=self.name)
+            self.__maybe_save_output_to_state(event)  # Save to state
+            yield event
             return
 
         try:
@@ -92,24 +110,30 @@ class EmailAnalyzer(BaseAgent):
         except (ValueError, TypeError) as e:
             logger.error(f"[{self.name}] Failed to parse unread emails data: {e}")
             ctx.session.state["meeting_result"] = "parsing_failed"
-            # --- FIX 2: Add author to all Event yields ---
-            yield Event(
+            event = Event(
                 content=types.Content(parts=[types.Part(text=f"Email analysis failed: {e}")]),
                 author=self.name,
             )
+            self.__maybe_save_output_to_state(event)  # Save to state
+            yield event
             return
 
         emails_list = unread_emails_dict.get("unread_emails", [])
         logger.info(f"[{self.name}]✅ Found {len(emails_list)} unread emails to analyze.")
         if not emails_list:
             ctx.session.state["meeting_result"] = "no_action_needed"
-            yield Event(content=types.Content(parts=[types.Part(text="No unread emails found to analyze.")]), author=self.name)
+            event = Event(content=types.Content(parts=[types.Part(text="No unread emails found to analyze.")]), author=self.name)
+            self.__maybe_save_output_to_state(event)  # Save to state
+            yield event
             return
 
         logger.info(f"[{self.name}] Analyzing {len(emails_list)} emails for hot leads...")
         hot_leads_found = 0
         meeting_requests_found = 0
 
+        ctx.session.state["calendar_request"] = ''
+        ctx.session.state["email_message_id"] = ''
+        
         for email_data in emails_list:
             sender_email = email_data.get("sender_email_address", "") or email_data.get("sender_email", "")
             if not sender_email:
@@ -133,13 +157,18 @@ class EmailAnalyzer(BaseAgent):
                     logger.info(f"[{self.name}]✅ LLM analysis result for {sender_email}: {calendar_request_data}")
                     if calendar_request_data.get("status") == "meeting_request":
                         logger.info(f"[{self.name}] Meeting request found from hot lead: {sender_email}")
-                        
+
                         ctx.session.state["calendar_request"] = calendar_request_data
-                        ctx.session.state["email_data"] = emails_list
+                        ctx.session.state["email_message_id"] = email_data.get("message_id", "")
+                        ctx.session.state["email_data"] = email_data
                         
+                        # Propagate events from sub-agent and save to state
                         async for event in self.calendar_organizer_agent.run_async(ctx):
+                            self.__maybe_save_output_to_state(event)  # Save to state
                             yield event
                         break
+                    else:
+                        logger.info(f"[{self.name}] No meeting request found in email from {sender_email}.")
                     
             except Exception as e:
                 # This will catch errors during check_hot_lead or _is_meeting_request_llm
@@ -149,9 +178,11 @@ class EmailAnalyzer(BaseAgent):
         summary_message = f"Analyzed {len(emails_list)} emails. Found {hot_leads_found} hot leads and {meeting_requests_found} meeting requests. No further action needed at this time."
         ctx.session.state["meeting_result"] = "no_meeting_requests"
         
-        # --- FIX 2: Add author to all Event yields ---
-        yield Event(
+        # Create final event and save to state
+        event = Event(
             content=types.Content(parts=[types.Part(text=summary_message)]),
             author=self.name,
         )
+        self.__maybe_save_output_to_state(event)  # Save to state
+        yield event
         logger.info(f"[{self.name}] Email analysis workflow finished.")

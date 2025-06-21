@@ -198,19 +198,19 @@ async def check_unread_emails() -> Dict[str, Any]:
             "message": f"Error checking emails: {str(e)}"
         }
 
-async def mark_email_as_read(message_id: str) -> Dict[str, Any]:
+async def mark_email_as_read(email_message_id: str) -> Dict[str, Any]:
     """
     Mark a specific email as read.
     
     Args:
-        message_id: The Gmail message ID to mark as read
-        
+        email_message_id: The Gmail message ID to mark as read
+
     Returns:
         Dictionary containing operation result
     """
     try:
-        logger.info(f"📝 Marking email as read: {message_id}")
-        
+        logger.info(f"📝 Marking email as read: {email_message_id}")
+
         # Create credentials with delegation
         credentials = service_account.Credentials.from_service_account_file(
             SERVICE_ACCOUNT_FILE, scopes=GMAIL_SCOPES
@@ -223,14 +223,14 @@ async def mark_email_as_read(message_id: str) -> Dict[str, Any]:
         # Mark as read by removing UNREAD label
         service.users().messages().modify(
             userId='me',
-            id=message_id,
+            id=email_message_id,
             body={'removeLabelIds': ['UNREAD']}
         ).execute()
-        
-        logger.info(f"✅ Email marked as read: {message_id}")
+
+        logger.info(f"✅ Email marked as read: {email_message_id}")
         return {
             "success": True,
-            "message_id": message_id,
+            "message_id": email_message_id,
             "message": "Email successfully marked as read"
         }
         
@@ -238,7 +238,7 @@ async def mark_email_as_read(message_id: str) -> Dict[str, Any]:
         logger.error(f"❌ Error marking email as read: {e}")
         return {
             "success": False,
-            "message_id": message_id,
+            "message_id": email_message_id,
             "error": str(e),
             "message": f"Error marking email as read: {str(e)}"
         }
