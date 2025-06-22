@@ -685,6 +685,10 @@ class DashboardManager {
         console.log('Dialog should now be visible. Current display:', dialog.style.display);
         console.log('Dialog computed style:', window.getComputedStyle(dialog).display);
         
+        // Initialize phone input with masking and button state
+        this.initializePhoneInput();
+        this.updateSendButtonState();
+        
         // Add event listener for ESC key
         document.addEventListener('keydown', this.handleDialogKeydown);
     }
@@ -725,9 +729,122 @@ class DashboardManager {
         }
     }
     
+    initializePhoneInput() {
+        const phoneInput = document.getElementById('sdr-phone-input');
+        if (!phoneInput) return;
+        
+        // Clear any existing value
+        phoneInput.value = '';
+        
+        // Remove existing event listeners to avoid duplicates
+        phoneInput.removeEventListener('input', this.handlePhoneInput);
+        phoneInput.removeEventListener('blur', this.handlePhoneBlur);
+        
+        // Add phone number masking
+        this.    handlePhoneInput = (e) => {
+            let value = e.target.value.replace(/\D/g, ''); // Remove all non-digits
+            let formattedValue = '';
+            
+            if (value.length > 0) {
+                if (value.length <= 3) {
+                    formattedValue = `(${value}`;
+                } else if (value.length <= 6) {
+                    formattedValue = `(${value.slice(0, 3)}) ${value.slice(3)}`;
+                } else {
+                    formattedValue = `(${value.slice(0, 3)}) ${value.slice(3, 6)}-${value.slice(6, 10)}`;
+                }
+            }
+            
+            e.target.value = formattedValue;
+            
+            // Update button state immediately
+            this.updateSendButtonState();
+        };
+        
+        // Add validation on blur
+        this.handlePhoneBlur = (e) => {
+            const value = e.target.value.replace(/\D/g, '');
+            if (value.length !== 10) {
+                e.target.setCustomValidity('Please enter a valid 10-digit US phone number');
+            } else {
+                e.target.setCustomValidity('');
+            }
+            this.updateSendButtonState();
+        };
+        
+        phoneInput.addEventListener('input', this.handlePhoneInput);
+        phoneInput.addEventListener('blur', this.handlePhoneBlur);
+    }
+    
+    updateSendButtonState() {
+        const phoneInput = document.getElementById('sdr-phone-input');
+        const sendButton = document.getElementById('confirm-sdr-btn');
+        const validationStatus = document.getElementById('phone-validation-status');
+        const validationIcon = document.getElementById('phone-validation-icon');
+        
+        if (!phoneInput || !sendButton) return;
+        
+        const phoneValue = phoneInput.value.replace(/\D/g, '');
+        // Simplified validation - just check if we have 10 digits (US phone number)
+        const isValid = phoneValue.length === 10;
+        
+        sendButton.disabled = !isValid;
+        
+        if (isValid) {
+            sendButton.innerHTML = '<i class="fas fa-paper-plane"></i> Send to SDR';
+            phoneInput.classList.add('valid-input');
+            phoneInput.classList.remove('invalid-input');
+            
+            if (validationStatus) {
+                validationStatus.textContent = 'Valid number';
+                validationStatus.className = 'validation-status valid';
+            }
+            
+            if (validationIcon) {
+                validationIcon.innerHTML = '✓';
+                validationIcon.style.display = 'block';
+                validationIcon.style.color = 'var(--success-color)';
+            }
+        } else {
+            if (phoneValue.length > 0) {
+                sendButton.innerHTML = '<i class="fas fa-paper-plane"></i> Enter Valid Phone';
+                phoneInput.classList.add('invalid-input');
+                phoneInput.classList.remove('valid-input');
+                
+                if (validationStatus) {
+                    validationStatus.textContent = 'US format required (10 digits)';
+                    validationStatus.className = 'validation-status invalid';
+                }
+                
+                if (validationIcon) {
+                    validationIcon.innerHTML = '✗';
+                    validationIcon.style.display = 'block';
+                    validationIcon.style.color = 'var(--danger-color)';
+                }
+            } else {
+                sendButton.innerHTML = '<i class="fas fa-paper-plane"></i> Enter Phone Number';
+                phoneInput.classList.remove('invalid-input');
+                phoneInput.classList.remove('valid-input');
+                
+                if (validationStatus) {
+                    validationStatus.textContent = '';
+                    validationStatus.className = 'validation-status';
+                }
+                
+                if (validationIcon) {
+                    validationIcon.style.display = 'none';
+                }
+            }
+        }
+    }
+    
     async confirmSendToSdr() {
         const button = document.getElementById('confirm-sdr-btn');
         const businessId = button.getAttribute('data-business-id');
+        const phoneInput = document.getElementById('sdr-phone-input');
+        
+        // Button should already be disabled if phone is invalid, but double-check
+        if (button.disabled) return;
         
         if (!businessId) {
             console.error('No business ID found');
@@ -735,13 +852,22 @@ class DashboardManager {
             return;
         }
         
-        // Disable the button
+        const phoneValue = phoneInput.value.replace(/\D/g, '');
+        
+        // Final validation (should not be needed due to real-time validation)
+        if (phoneValue.length !== 10) {
+            this.showErrorToast('Please enter a valid 10-digit US phone number');
+            return;
+        }
+        
+        // Disable the button and show loading
         button.disabled = true;
         button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
         
         try {
             const formData = new FormData();
             formData.append('business_id', businessId);
+            formData.append('user_phone', phoneValue);
             
             const response = await fetch('/send_to_sdr', {
                 method: 'POST',

@@ -130,12 +130,12 @@ class SalesShortcutTemplate:
         canvas.setFillColor(white)
 
         logo_y = height - 1.5*cm
-        canvas.drawCentredString(width/2, logo_y, "🚀 SalesShortcut")
+        canvas.drawCentredString(width/2, logo_y, "🚀 ZemZen Web Solutions")
 
         canvas.setFont("Helvetica", 14)
         canvas.setFillColor(colors.Color(1, 1, 1, 0.9))
-        canvas.drawCentredString(width/2, logo_y - 0.6*cm, "AI-Powered Lead Generation & Management Proposal")
-        canvas.drawCentredString(width/2, logo_y - 0.9*cm, "Prepared by BrightWeb Studio")
+        canvas.drawCentredString(width/2, logo_y - 0.6*cm, "\n AI-Powered Lead Generation & Management Proposal\n")
+        canvas.drawCentredString(width/2, logo_y - 0.9*cm, "\nPrepared by BrightWeb Studio")
 
     def _draw_footer(self, canvas, width, height):
         """Draws the page number footer on all pages.
@@ -174,8 +174,8 @@ class MarkdownToPDFConverter:
 
         custom_styles = {
             'CustomTitle': ParagraphStyle(
-                'CustomTitle', parent=styles['Heading1'], fontSize=22, spaceAfter=16,
-                spaceBefore=8, textColor=primary_color, fontName='Helvetica-Bold',
+                'CustomTitle', parent=styles['Heading1'], fontSize=22, spaceAfter=34,
+                spaceBefore=16, textColor=primary_color, fontName='Helvetica-Bold',
                 alignment=TA_LEFT, leading=28
             ),
             'CustomHeading1': ParagraphStyle(

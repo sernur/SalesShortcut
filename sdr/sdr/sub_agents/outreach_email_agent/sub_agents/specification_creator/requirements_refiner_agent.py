@@ -12,8 +12,6 @@ requirements_refiner_agent = LlmAgent(
     description="Agent that analyzes customer needs and refines business requirements for commercial offers",
     model=MODEL_THINK,
     instruction=REQUIREMENTS_REFINER_PROMPT.format(
-        business_data="{business_data}",
-        proposal="{proposal}",
         markdown_template=template
     ),
     output_key="refined_requirements"

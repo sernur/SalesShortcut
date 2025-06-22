@@ -220,5 +220,42 @@ def send_email(to_email: str, subject: str, body: str, attachment_path: Optional
             "message": f"Failed to send email from {SALES_EMAIL} to {to_email}"
         }
 
+def send_email_with_attachment(crafted_email: dict[str, Any], attachment_path: Optional[str] = None) -> dict[str, Any]:
+    """
+    Tool function to send email with optional attachment.
 
-send_email_tool = FunctionTool(func=send_email)
+    Args:
+        crafted_email: dict containing email details with keys 'to', 'subject', and 'body'
+        attachment_path: Optional path to attachment file
+
+    Returns:
+        dict containing send result with status and message/error info
+    """
+    logger.info(f"[TOOL] Crafted email received: {crafted_email}")
+    logger.info(f"[TOOL] Attachment path received: {attachment_path}")
+    
+    # Ensure crafted_email has required fields
+    if not crafted_email or not isinstance(crafted_email, dict):
+        error_msg = f"Invalid crafted_email format. Must be a dict with 'to', 'subject', and 'body'. Received: {type(crafted_email)} - {crafted_email}"
+        logger.error(f"[TOOL ERROR] {error_msg}")
+        return {
+            "status": "failed",
+            "error": error_msg
+        }
+    to_email = crafted_email.get('to')
+    subject = crafted_email.get('subject', '')
+    body = crafted_email.get('body', '')
+    
+    # Validate required fields
+    if not to_email:
+        error_msg = f"Missing required 'to' field in crafted_email. Received: {crafted_email}"
+        logger.error(f"[TOOL ERROR] {error_msg}")
+        return {
+            "status": "failed",
+            "error": error_msg
+        }
+    
+    logger.info(f"[TOOL] Calling send_email with: to={to_email}, subject='{subject}', body_length={len(body)}, attachment={attachment_path}")
+    return send_email(to_email, subject, body, attachment_path)
+
+send_email_with_attachment_tool = FunctionTool(func=send_email_with_attachment)

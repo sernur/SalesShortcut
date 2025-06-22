@@ -3,21 +3,16 @@ PROMPT_PREPARE_PROMPT = """
    You are an AI agent that prepares a LLM prompt for AI website creation.
 
    ### MARKDOWN TEMPLATE
-   {refined_requirements}
+   state['refined_requirements'] contains the refined requirements in markdown format.
 
-   ### INSTRUCTION
-   1. Read the website requirements and preferences from the state['refined_requirements'] key.
-   2. Generate a simple prompt that includes:
-      - The website map
-      - Color and marketing preferences
-      - Design preferences (colors, layout, etc.)
-      - Any specific content or sections required
-   3. Mention in a prompt that the website should not use any other dependencies like Gemini or Google API keys.
-   4. Make sure that the prompt is easy and simple UI static website example to show the user how the website will look like.
-   5. At the end of the prompt, include a note that the website should be created as beautiful demo prototype.
-   6. Main purpose of the website is not implement the functionality, but to show the user how the website will look like.
-   7. The main goal is to create a prompt that would be both easy to implement for AI website builder and feel personalized for the user based on the refined requirements.
-   8. Save the generated prompt in the state['website_creation_prompt'] key.
+   ### INSTRUCTIONS
+   1. Read the website requirements and preferences from the state['refined_requirements'] key to understand the business context.
+   2. Generate the following 2 paraphraphs prompt to the LLM website builder:
+      - 1 paragraph including the website map, color and marketing preferences, design preferences (colors, layout, etc.) and any specific content or sections required
+      - 1 paragraph the identity information of the business, business name, slogan, personalization and any other information that is native to the business
+   3. Use best practices for prompt engineering to ensure both simple solution and high personalization.
+   4. Do not include any technical jargon, details, stack or programming languages in the prompt.
+   5. Save the generated prompt in the 'website_creation_prompt' key.
 
    ### OUTPUT
    Provide the generated prompt in a single string in the state['website_creation_prompt'] key.
@@ -30,7 +25,7 @@ REQUEST_HUMAN_CREATION_PROMPT = """
    ### AVAILABLE TOOLS
       - **request_human_input_tool**: Send a notification to the UI for human input
       
-   Demo website creation prompt: {website_creation_prompt}
+   Demo website creation prompt: state['website_creation_prompt']
    
    ### INSTRUCTION
    1. Read the state['website_creation_prompt'] key to understand the requirements for the website creation and pass it to the `request_human_input_tool`.
@@ -51,12 +46,12 @@ OFFER_FILE_CREATOR_PROMPT = """
    1. **edit_proposal_content**: Edit the entire proposal content based on specific instructions
    2. **replace_content_section**: Replace a specific section in the proposal with new content  
    3. **add_content_section**: Add new sections to the proposal at specified positions
-   4. **create_sales_proposal_pdf**: Generate a PDF file from the final markdown proposal content
+   4. **create_offer_file**: Generate a PDF file from the final markdown proposal content
 
    ### CONTEXT INFORMATION
    The following information is available in the session state:
-   - Refined requirements: {refined_requirements}
-   - Website preview link: {website_preview_link}
+   - Refined requirements: state['refined_requirements']
+   - Website preview link: state['website_preview_link']
 
    ### INSTRUCTION
    1. **Read the proposal content**: Access the markdown proposal content from the session state key 'refined_requirements'.
@@ -66,7 +61,7 @@ OFFER_FILE_CREATOR_PROMPT = """
       - Use `replace_content_section` to update specific sections
       - Use `add_content_section` to add new sections
 
-   3. **Create the final PDF**: Use the `create_sales_proposal_pdf` function with the final markdown content.
+   3. **Create the final PDF**: Use the `create_offer_file` function with the final markdown content. Ensure this gets saved to the session state['offer_file_path'].
 
    4. **Save the result**: The function will return a file path - ensure this gets saved to the session state.
 
@@ -79,10 +74,13 @@ OFFER_FILE_CREATOR_PROMPT = """
    ### EXECUTION FLOW
    1. Access refined_requirements from session state
    2. Optionally edit/enhance the content using available tools
-   3. Generate PDF using create_sales_proposal_pdf
+   3. Generate PDF using create_offer_file
    4. Return success confirmation with file path
 
    Begin by reading the refined requirements from the session state and creating the offer file.
+   
+   ### OUTPUT
+   Provide the final offer file path in the session state under 'offer_file_path' key (return of the `create_offer_file` function).
 """
 
    
@@ -121,16 +119,16 @@ EMAIL_CRAFTER_PROMPT = """
    {
    "to": "john.doe@example.com",
    "subject": "Follow-up on Our Recent Call - Proposal for {business_data['company_name']}",
-   "body": "Reach text of the email goes here, This is your personal website preview link: {website_preview_link}",
+   "body": "Reach text of the email goes here, This is your personal website preview link: {state['website_preview_link']}",
    "attachment": "offer_file_path"  # Include offer_file_path if available, otherwise empty string
    }
    ```
 
-   Destination at: {call_result}
-   Business Data: {business_data}
-   Proposal: {refined_requirements}
-   Preview Website: {website_preview_link}
-   Attachment Path (if available): {offer_file_path}
+   Destination at: state['call_result']
+   Business Data: state['business_data']
+   Proposal: state['refined_requirements']
+   Preview Website: state['website_preview_link']
+   Attachment Path (if available): state['offer_file_path']
 
    Write the email content and save it under the 'crafted_email' output key.
    """
@@ -140,49 +138,40 @@ EMAIL_SENDER_AGENT_PROMPT = """
    ### ROLE
    You are an Email Agent responsible for sending personalized business outreach emails with commercial offers using service account authentication (no manual auth required).
    
-   Email data: {crafted_email}
-   Offer file path: {offer_file_path}
+   Email data: state['crafted_email']
+   Offer file path: state['offer_file_path']
 
    ### AVAILABLE TOOLS
-   1. **send_email_tool**: Send email with optional attachment - send_email_tool(to_email, subject, body, attachment_path)
+   1. **send_email_with_attachment_tool**: Send email with optional attachment - send_email_with_attachment_tool(crafted_email, attachment_path)
 
    ### CRITICAL INSTRUCTIONS
-   You MUST use the send_email_tool tool to actually send the email. Do not just describe what you would do - CALL THE TOOL.
+   You MUST use the send_email_with_attachment_tool tool to actually send the email. Do not just describe what you would do - CALL THE TOOL.
 
    ### INSTRUCTIONS
-   1. Extract the email details from the "Email data:" section above (it contains to, subject, body, attachment fields).
-   2. Extract the file path from the "Offer file path:" section above.
-   3. IMMEDIATELY call the `send_email_tool` tool with these extracted values.
-   4. Use the actual values from the data provided above, not placeholder text.
+   1. Extract the email details from state['crafted_email'] (contains to, subject, body fields).
+   2. Extract the file path from state['offer_file_path'].
+   3. IMMEDIATELY call the `send_email_with_attachment_tool` tool with a properly formatted crafted_email dict and attachment_path.
+   4. Pass the crafted_email as a complete dictionary with 'to', 'subject', and 'body' keys.
    5. If the offer file path is empty or null, pass None for attachment_path.
    6. The service account will automatically send from sales@zemzen.org - no manual authentication needed.
 
    ### EXAMPLE USAGE
-   You must call the send_email_tool function like this:
+   You must call the send_email_with_attachment_tool function like this:
    ```
-   send_email_tool(
-       to_email="recipient@example.com",  # Use the 'to' field from crafted_email data above
-       subject="Email Subject",           # Use the 'subject' field from crafted_email data above
-       body="Email body content",         # Use the 'body' field from crafted_email data above
-       attachment_path="/path/to/file.pdf"  # Use the offer_file_path from above if available
+   send_email_with_attachment_tool(
+      crafted_email={
+         "to": "recipient@example.com",
+         "subject": "Email subject",
+         "body": "Email body text"
+      },
+      attachment_path="/path/to/file.pdf"
    )
    ```
 
    ### IMPORTANT
    - DO NOT just return a JSON response without calling the tool
-   - ALWAYS call the send_email_tool function first
+   - ALWAYS call the send_email_with_attachment_tool function first
    - Return the result from the tool call
-
-   ### OUTPUT
-   After calling the send_email_tool tool, provide the email sending result in the following format:
-   ```json
-   {
-   "status": "success" | "failed",
-   "message": "Email sent successfully" | "Error message",
-   "crafted_email": "The email data that was sent",
-   "message_id": "gmail_message_id" (if successful)
-   }
-   ```
    
    Provide the email sending result under the 'email_sent_result' output key.
    """

@@ -48,7 +48,9 @@ class SDRAgentExecutor(AgentExecutor):
             session_service=InMemorySessionService(),
             artifact_service=InMemoryArtifactService(),
         )
+        self._completed_function_calls = set()
         logger.info("SDRAgentExecutor initialized with ADK Runner and artifact service.")
+
 
     async def execute(self, context: RequestContext, event_queue: EventQueue):
         task_updater = TaskUpdater(event_queue, context.task_id, context.context_id)
@@ -104,7 +106,9 @@ class SDRAgentExecutor(AgentExecutor):
             )
             return
 
-        
+        initial_business_data = f"Initial business data: {json.dumps(business_data, indent=2)}"
+        log_to_file(initial_business_data)
+
         # Create a clear user message for the agent
         business_name = business_data.get("name", "Unknown Business")
         user_message = f"Process SDR outreach for business lead: {business_name}"
@@ -146,11 +150,17 @@ class SDRAgentExecutor(AgentExecutor):
                         session_id=session_id_for_adk,
                         state={
                             "business_data": business_data,
-                            "call_result": '',
-                            "refined_requirements": '',
+                            # "call_result": '',
+                            "call_category": '',
+                            # "crafted_email": '',
+                            # "engagement_saved_result": '',
+                            # "email_sent_result": '',
+                            # "refined_requirements": '',
+                            # "draft_proposal": '',
+                            # "offer_file_path": '',
+                            "proposal": '',
+                            # "research_result": '',
                             "website_preview_link": '',
-                            "offer_file_path": '',
-                            "crafted_email": '',
                         },  # Store business data in session state
                     )
                     if session:
@@ -225,6 +235,14 @@ class SDRAgentExecutor(AgentExecutor):
                         # Function call events: relay tool invocation details
                         if hasattr(part, 'function_call') and part.function_call:
                             fc = part.function_call
+                            # Create a unique identifier for this function call
+                            function_call_id = f"{fc.name}:{json.dumps(fc.args)}"
+                            
+                            # Skip if we've already processed this exact function call
+                            if function_call_id in self._completed_function_calls:
+                                logger.warning(f"- ❌ - Skipping duplicate function call: {fc.name}")
+                                continue
+
                             # Send the tool name and args for transparency
                             msg = task_updater.new_agent_message(
                                 parts=[Part(root=DataPart(data={
@@ -233,6 +251,8 @@ class SDRAgentExecutor(AgentExecutor):
                                 }))]
                             )
                             task_updater.update_status(TaskState.working, message=msg)
+                            # Otherwise track tool as completed
+                            self._completed_function_calls.add(function_call_id)
                 
                 # Capture function call results (like phone_call)
                 if event.content and event.content.parts:

@@ -331,11 +331,20 @@
                         <li>Update you on the engagement status</li>
                     </ul>
                 </div>
+                <div class="phone-input-section">
+                    <label for="sdr-phone-input">Phone Number <span class="required-mark">*</span></label>
+                    <p class="field-description">Enter the phone number where you want to be reached for the call. This will override the business's phone number for outreach.</p>
+                    <div class="phone-input-wrapper">
+                        <input type="tel" id="sdr-phone-input" placeholder="(555) 123-4567" required>
+                        <span id="phone-validation-icon"></span>
+                    </div>
+                    <div id="phone-validation-status" class="validation-status"></div>
+                </div>
             </div>
             <div class="modal-actions">
-                <button class="btn-primary" id="confirm-sdr-btn" onclick="confirmSendToSdr()">
+                <button class="btn-primary" id="confirm-sdr-btn" onclick="confirmSendToSdr()" disabled>
                     <i class="fas fa-paper-plane"></i>
-                    Send to SDR
+                    Enter Phone Number
                 </button>
             </div>
         </div>

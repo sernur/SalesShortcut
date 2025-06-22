@@ -838,7 +838,7 @@ async def agent_callback(update: AgentUpdate):
         # Fallback fields from various possible keys
         name = data.get("name") or data.get("sender_name") or data.get("lead_name")
         city = data.get("city") or ""
-        phone = data.get("phone") or data.get("lead_phone")
+        phone = data.get("phone") or data.get("lead_phone") or data.get("phone_number")
         email = data.get("email") or data.get("sender_email") or data.get("lead_email")
         description = (
             data.get("description") or data.get("subject") or data.get("email_subject") or data.get("body_preview")
@@ -994,7 +994,10 @@ async def get_status():
     }
 
 @app.post("/send_to_sdr")
-async def send_business_to_sdr(business_id: str = Form(...)):
+async def send_business_to_sdr(
+    business_id: str = Form(...), 
+    user_phone: Optional[str] = Form(None)
+):
     """Send a business to the SDR agent for processing."""
     try:
         # Check if business exists
@@ -1008,6 +1011,12 @@ async def send_business_to_sdr(business_id: str = Form(...)):
         
         # Convert business to dict for sending to SDR
         business_data = business.model_dump()
+        
+        # Override phone number if user provided one
+        if user_phone:
+            business_data["phone_number"] = user_phone
+            business_data["phone"] = user_phone
+            logger.info(f"Overriding phone number to: {user_phone} for business {business.name}")
         
         # Get current session ID
         session_id = app_state["session_id"] or str(uuid.uuid4())

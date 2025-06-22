@@ -1,0 +1,26 @@
+{
+  "timestamp": "2025-06-22T12:34:33.745432",
+  "data": {
+    "full_meeting_data": {
+      "start_datetime": "2025-06-27T15:00:00-06:00",
+      "end_datetime": "2025-06-27T16:00:00-06:00",
+      "status": "meeting_request",
+      "description": "Merdan proposed a meeting on June 27, 3 PM",
+      "title": "Meeting with Merdan Durdyev",
+      "attendees": [
+        "meinnps@gmail.com",
+        "sales@zemzen.org"
+      ]
+    },
+    "full_email_data": {
+      "sender_name": "Merdan Durdyev",
+      "body": "yes lets do in on June 27, 3 PM\r\n\r\nOn Sun, Jun 22, 2025 at 12:31 PM <sales@zemzen.org> wrote:\r\n\r\n> Hi Tilden Hotel Team,\r\n>\r\n> It was great speaking with you earlier. As discussed, I'm following up\r\n> with the proposal outlining how ZemZen can create a stunning new\r\n> website to showcase your unique Art Deco charm and drive more direct\r\n> bookings.\r\n>\r\n> This website will be more than just a digital presence; it will be a\r\n> dynamic experience that captures the essence of the Tilden Hotel and\r\n> provides guests with a seamless booking process.\r\n>\r\n> Take a look at the demo website to see what we mean:\r\n>\r\n> https://6000-firebase-studio-1750596153869.cluster-cxy3ise3prdrmx53pigwexthgs.cloudworkstations.dev/\r\n>\r\n> We believe this website will enhance your brand, attract more guests,\r\n> and increase revenue. I've attached a detailed proposal for your\r\n> review. What time works best for you to arrange a follow-up meeting?\r\n>\r\n> Looking forward to your response!\r\n>\r\n> Best regards,\r\n>\r\n> Lexi\r\n> Sales Team\r\n> ZemZen\r\n> sales@zemzen.org",
+      "message_id": "19798ea7cd6e49ac",
+      "subject": "Re: Follow-up on Our Recent Call - Proposal for Tilden Hotel",
+      "sender_email": "meinnps@gmail.com",
+      "date_received": "2025-06-22T12:32:35-06:00",
+      "thread_conversation_history": [],
+      "thread_id": "19798e912a75c416"
+    }
+  }
+}

@@ -1132,6 +1132,100 @@
   background: var(--gray-100);
 }
 
+/* Phone Input Section Styles */
+.phone-input-section {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: var(--gray-50);
+  border-radius: 8px;
+  border: 1px solid var(--gray-200);
+}
+
+.phone-input-section label {
+  display: block;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.phone-input-section .field-description {
+  font-size: 0.85rem;
+  color: var(--gray-600);
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
+  background: rgba(37, 99, 235, 0.05);
+  padding: 0.5rem;
+  border-radius: 4px;
+  border-left: 3px solid var(--primary-color);
+}
+
+.phone-input-section .phone-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.phone-input-section input[type="tel"] {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--border-radius);
+  font-size: 1rem;
+  height: 48px; /* reduced height for more concise look */
+  transition: border-color 0.2s ease;
+  text-align: left;
+  letter-spacing: normal;
+}
+
+.phone-input-section .required-mark {
+  color: var(--danger-color);
+  font-weight: bold;
+}
+
+#phone-validation-icon {
+  position: absolute;
+  right: 10px;
+  font-size: 16px;
+  display: none;
+  transition: all 0.2s ease;
+  width: 20px;
+  height: 20px;
+  text-align: center;
+  line-height: 20px;
+  border-radius: 50%;
+}
+
+.phone-input-section input[type="tel"]:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.phone-input-section input[type="tel"]:invalid {
+  border-color: var(--danger-color);
+}
+
+/* Removed warning text, replaced with validation message */
+
+/* Phone input validation styles */
+.phone-input-section input.valid-input {
+  border: 2px solid var(--success-color);
+  background-color: rgba(40, 167, 69, 0.05);
+}
+
+.phone-input-section input.invalid-input {
+  border: 2px solid var(--danger-color);
+  background-color: rgba(220, 53, 69, 0.05);
+}
+
+/* Disabled send button styling */
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--gray-400) !important;
+}
+
 /* Human Input Modal Styles */
 .human-input-dialog {
   max-width: 580px !important;
@@ -1274,4 +1368,24 @@
   .copy-prompt-btn {
     align-self: flex-end;
   }
+}
+
+/* Phone validation status styles */
+.phone-input-section .validation-status {
+  font-size: 0.75rem;
+  display: none;
+  margin-top: 4px;
+  font-style: italic;
+  transition: all 0.2s ease;
+  height: 18px;
+}
+
+.phone-input-section .validation-status.valid {
+  display: block;
+  color: var(--success-color);
+}
+
+.phone-input-section .validation-status.invalid {
+  display: block;
+  color: var(--danger-color);
 }

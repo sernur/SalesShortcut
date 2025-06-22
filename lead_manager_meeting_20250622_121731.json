@@ -1,0 +1,26 @@
+{
+  "timestamp": "2025-06-22T12:17:31.142729",
+  "data": {
+    "full_meeting_data": {
+      "end_datetime": "2025-06-28T16:00:00-06:00",
+      "title": "Meeting with Merdan Durdyev",
+      "description": "Meeting to discuss the Tilden Hotel proposal.",
+      "status": "meeting_request",
+      "start_datetime": "2025-06-28T15:00:00-06:00",
+      "attendees": [
+        "meinnps@gmail.com",
+        "sales@zemzen.org"
+      ]
+    },
+    "full_email_data": {
+      "thread_conversation_history": [],
+      "body": "Yes lets meet on June 28 at 3 PM to discuss this further on the Tilden\nHotel proposal.\n\nOn Sun, Jun 22, 2025 at 12:14 PM <sales@zemzen.org> wrote:\n\n> Hi there,\n>\n> It was a pleasure speaking with you earlier today! As promised, I'm\n> sending over a proposal outlining how ZemZen can help the Tilden Hotel\n> enhance its online presence and drive more direct bookings with a\n> professionally designed website. You can also see a live preview of\n> what we can offer here:\n>\n> https://6000-firebase-studio-1750596153869.cluster-cxy3ise3prdrmx53pigwexthgs.cloudworkstations.dev/\n>\n> Our research highlights the Tilden Hotel's unique appeal, from its\n> art-focused environment to its prime downtown San Francisco location.\n> A dedicated website presents a significant opportunity to enhance your\n> brand image, showcase your distinctive offerings, and drive direct\n> bookings, increasing profitability.\n>\n> I've attached the full proposal for your review. Please take a look\n> when you have a moment.\n>\n> Would you be available for a quick call on July 10th at 3 PM to\n> discuss this further?\n>\n> Looking forward to your response!\n>\n> Best regards,\n>\n> Lexi\n> ZemZen\n> sales@zemzen.org",
+      "sender_name": "Merdan Durdyev",
+      "message_id": "19798db738e5f930",
+      "sender_email": "meinnps@gmail.com",
+      "subject": "Re: Follow-up on Our Recent Call - Proposal for Tilden Hotel",
+      "date_received": "2025-06-22T12:16:10-06:00",
+      "thread_id": "19798d95edac539e"
+    }
+  }
+}
