@@ -10,6 +10,8 @@ import json
 import time
 import os
 import logging
+import threading
+import requests
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor
 from google.cloud import pubsub_v1
@@ -25,6 +27,8 @@ PROJECT_ID = os.getenv("PROJECT_ID")
 SUBSCRIPTION_NAME = os.getenv("SUBSCRIPTION_NAME", "gmail-notifications-pull")
 SALES_EMAIL = os.getenv("SALES_EMAIL")
 SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE", ".secrets/sales-automation-service.json")
+LEAD_MANAGER_URL = os.getenv("LEAD_MANAGER_URL", "http://localhost:8082")
+CRON_INTERVAL = 30  # seconds
 
 # Set up logging
 logging.basicConfig(
@@ -38,6 +42,7 @@ class GmailPubSubListener:
         self.project_id = PROJECT_ID
         self.subscription_name = SUBSCRIPTION_NAME
         self.sales_email = SALES_EMAIL
+        self.lead_manager_url = LEAD_MANAGER_URL
         
         # Initialize Pub/Sub subscriber
         self.subscriber = pubsub_v1.SubscriberClient()
@@ -48,9 +53,15 @@ class GmailPubSubListener:
         # Initialize Gmail service
         self.gmail_service = self._init_gmail_service()
         
+        # Cron job control
+        self.cron_active = False
+        self.cron_thread = None
+        self.stop_cron = threading.Event()
+        
         logger.info(f"🚀 Gmail Listener initialized")
         logger.info(f"   📧 Email: {self.sales_email}")
         logger.info(f"   📡 Subscription: {self.subscription_path}")
+        logger.info(f"   🎯 Lead Manager URL: {self.lead_manager_url}")
     
     def _init_gmail_service(self):
         """Initialize Gmail API service with delegation"""
@@ -172,37 +183,34 @@ class GmailPubSubListener:
         except Exception as e:
             logger.error(f"❌ Error checking recent messages: {e}")
     
-    def trigger_adk_agent(self, message_id, sender, subject, full_message):
-        """Trigger your ADK Agent via A2A"""
-        logger.info(f"🤖 Triggering ADK Agent for message {message_id}")
+    def trigger_adk_agent(self, message_id=None, sender=None, subject=None, full_message=None):
+        """Trigger Lead Manager ADK Agent via A2A"""
+        logger.info(f"🤖 Triggering Lead Manager ADK Agent")
         
-        # TODO: Replace this with your actual ADK Agent A2A call
-        # Example data you might send:
         agent_payload = {
-            "event_type": "new_email",
+            "event_type": "new_email" if message_id else "cron_check",
             "email_data": {
-                "message_id": message_id,
-                "sender": sender,
-                "subject": subject,
+                "message_id": message_id or "cron_trigger",
+                "sender": sender or "system",
+                "subject": subject or "Scheduled email check",
                 "timestamp": datetime.now().isoformat(),
                 "sales_email": self.sales_email
             }
         }
         
-        # Example A2A call (replace with your actual implementation):
         try:
-            # import requests
-            # response = requests.post(
-            #     "YOUR_ADK_AGENT_ENDPOINT",
-            #     json=agent_payload,
-            #     headers={"Authorization": "Bearer YOUR_TOKEN"}
-            # )
-            # logger.info(f"✅ ADK Agent triggered: {response.status_code}")
+            response = requests.post(
+                f"{self.lead_manager_url}/agents/lead-manager-agent/execute",
+                json=agent_payload,
+                headers={"Content-Type": "application/json"},
+                timeout=5
+            )
+            logger.info(f"✅ Lead Manager triggered: {response.status_code}")
             
-            logger.info(f"📤 Would trigger ADK Agent with: {agent_payload}")
-            
+        except requests.exceptions.Timeout:
+            logger.warning("⏰ Lead Manager request timed out (expected for one-way trigger)")
         except Exception as e:
-            logger.error(f"❌ Failed to trigger ADK Agent: {e}")
+            logger.error(f"❌ Failed to trigger Lead Manager: {e}")
     
     def message_callback(self, message):
         """Callback for processing Pub/Sub messages"""
@@ -288,6 +296,49 @@ class GmailPubSubListener:
             return False
         
         return True
+    
+    def check_pubsub_health(self):
+        """Check if Pub/Sub service is healthy"""
+        try:
+            subscription = self.subscriber.get_subscription(
+                request={"subscription": self.subscription_path}
+            )
+            logger.debug(f"✅ Pub/Sub health check passed")
+            return True
+        except Exception as e:
+            logger.warning(f"⚠️ Pub/Sub health check failed: {e}")
+            return False
+    
+    def start_cron_job(self):
+        """Start cron job to trigger lead manager every 30 seconds"""
+        if self.cron_active:
+            return
+            
+        self.cron_active = True
+        self.stop_cron.clear()
+        
+        def cron_worker():
+            logger.info(f"⏰ Starting cron job (every {CRON_INTERVAL}s)")
+            while not self.stop_cron.wait(CRON_INTERVAL):
+                try:
+                    logger.info("🔄 Cron trigger: checking for new emails")
+                    self.check_recent_messages()
+                    self.trigger_adk_agent()
+                except Exception as e:
+                    logger.error(f"❌ Cron job error: {e}")
+            logger.info("⏰ Cron job stopped")
+        
+        self.cron_thread = threading.Thread(target=cron_worker, daemon=True)
+        self.cron_thread.start()
+    
+    def stop_cron_job(self):
+        """Stop the cron job"""
+        if self.cron_active:
+            logger.info("🛑 Stopping cron job...")
+            self.stop_cron.set()
+            self.cron_active = False
+            if self.cron_thread:
+                self.cron_thread.join(timeout=5)
 
 def main():
     """Main function to run the listener"""
@@ -296,18 +347,39 @@ def main():
     # Create and test listener
     listener = GmailPubSubListener()
     
-    # Test connections first
-    if not listener.test_connection():
-        logger.error("❌ Connection tests failed, exiting")
+    # Test Gmail connection first (required)
+    if not listener.gmail_service:
+        logger.error("❌ Gmail service initialization failed, exiting")
         return
     
-    # Start listening
+    # Try to use Pub/Sub, fallback to cron job if not available
     try:
-        listener.start_listening()
-    except KeyboardInterrupt:
-        logger.info("🛑 Service stopped by user")
+        # Check Pub/Sub health
+        if listener.check_pubsub_health():
+            logger.info("✅ Pub/Sub service is healthy, starting listener")
+            listener.start_listening()
+        else:
+            raise Exception("Pub/Sub health check failed")
+            
     except Exception as e:
-        logger.error(f"❌ Service error: {e}")
+        logger.warning(f"⚠️ Pub/Sub service unavailable: {e}")
+        logger.info("🔄 Falling back to cron job mode")
+        
+        try:
+            # Start cron job fallback
+            listener.start_cron_job()
+            
+            # Keep main thread alive
+            logger.info("⏰ Cron job mode active - press Ctrl+C to stop")
+            while True:
+                time.sleep(1)
+                
+        except KeyboardInterrupt:
+            logger.info("🛑 Service stopped by user")
+            listener.stop_cron_job()
+        except Exception as cron_error:
+            logger.error(f"❌ Cron job error: {cron_error}")
+            listener.stop_cron_job()
 
 if __name__ == "__main__":
     main()

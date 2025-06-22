@@ -10,6 +10,7 @@
 
 # Default values for API keys (override in .env file or export before running)
 GOOGLE_API_KEY ?= $(shell echo $$GOOGLE_API_KEY)
+GOOGLE_MAPS_API_KEY ?= $(shell echo $$GOOGLE_MAPS_API_KEY)
 OPENAI_API_KEY ?= $(shell echo $$OPENAI_API_KEY)
 ANTHROPIC_API_KEY ?= $(shell echo $$ANTHROPIC_API_KEY)
 
@@ -19,29 +20,30 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 
-.PHONY: help deploy_local deploy_cloud test_local clean setup check_env
+.PHONY: help deploy_local deploy_cloud test_local clean setup check_env grant_public
 
 help:
 	@echo "SalesShortcut A2A Project - Available Commands:"
 	@echo ""
 	@echo "  make deploy_local               - Deploy all services locally (includes Outreach test client)"
-	@echo "  make deploy_cloud               - Deploy all services to cloud"
+	@echo "  make deploy_cloud [SERVICES=\"lead-finder lead-manager sdr gmail-listener ui-client\"] - Deploy specified (space-separated) or all services to cloud"
 	@echo "  make test_local                 - Run test deployment (UI Client + Lead Manager)"
 	@echo "  make clean                      - Kill all running services"
 	@echo "  make setup                      - Install Python dependencies"
 	@echo "  make check_env                  - Check environment variables"
-	@echo ""
-	@echo ""
+	@echo "  make grant_public               - Grant anonymous (public) access to all Cloud Run services"
 	@echo "  make help                       - Show this help"
 	@echo ""
 	@echo "Environment Variables:"
 	@echo "  GOOGLE_API_KEY       - Required for Gemini LLM inference"
+	@echo "  GOOGLE_MAPS_API_KEY  - Required for Google Maps lead search"
 	@echo "  OPENAI_API_KEY       - Optional for OpenAI models"
 	@echo "  ANTHROPIC_API_KEY    - Optional for Claude models"
 	@echo "  FORCE_SIMPLE_MODE    - Set to 'true' to avoid A2A dependency conflicts"
 	@echo ""
 	@echo "Create a .env file to set API keys automatically:"
 	@echo "  echo 'GOOGLE_API_KEY=your_key_here' > .env"
+	@echo ""
 
 check_env:
 	@echo "Checking environment variables..."
@@ -60,25 +62,32 @@ deploy_local: clean check_env
 	@echo "🚀 Deploying all services locally..."
 	@chmod +x ./deploy_local.sh
 	@GOOGLE_API_KEY="$(GOOGLE_API_KEY)" \
+	 GOOGLE_MAPS_API_KEY="$(GOOGLE_MAPS_API_KEY)" \
 	 OPENAI_API_KEY="$(OPENAI_API_KEY)" \
 	 ANTHROPIC_API_KEY="$(ANTHROPIC_API_KEY)" \
 	 ./deploy_local.sh
 
 deploy_cloud: check_env
-	@echo "☁️  Deploying all services to cloud..."
+	@echo "☁️  Deploying services: $(if $(SERVICES),$(SERVICES),all) to cloud..."
 	@chmod +x ./deploy_cloud_run.sh
 	@GOOGLE_API_KEY="$(GOOGLE_API_KEY)" \
+	 GOOGLE_MAPS_API_KEY="$(GOOGLE_MAPS_API_KEY)" \
 	 OPENAI_API_KEY="$(OPENAI_API_KEY)" \
 	 ANTHROPIC_API_KEY="$(ANTHROPIC_API_KEY)" \
-	 ./deploy_cloud_run.sh
+	 ./deploy_cloud_run.sh $(SERVICES)
 
 test_local: clean check_env
 	@echo "🧪 Running local test deployment (UI Client + Lead Manager)..."
 	@chmod +x ./test_local.sh
 	@GOOGLE_API_KEY="$(GOOGLE_API_KEY)" \
+	 GOOGLE_MAPS_API_KEY="$(GOOGLE_MAPS_API_KEY)" \
 	 OPENAI_API_KEY="$(OPENAI_API_KEY)" \
 	 ANTHROPIC_API_KEY="$(ANTHROPIC_API_KEY)" \
 	 ./test_local.sh
+grant_public:
+	@echo "🔓 Granting public (unauthenticated) access to all Cloud Run services..."
+	@chmod +x ./grant_public_access.sh
+	@./grant_public_access.sh
 
 PORTS_TO_CLEAN = 8000 8080 8081 8082 8083 8084
 
