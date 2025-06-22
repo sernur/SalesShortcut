@@ -80,15 +80,18 @@ test_local: clean check_env
 	 ANTHROPIC_API_KEY="$(ANTHROPIC_API_KEY)" \
 	 ./test_local.sh
 
+PORTS_TO_CLEAN = 8000 8080 8081 8082 8083 8084
 
 clean:
-	@echo "🧹 Stopping all services..."
-	@pkill -f "python -m ui_client" || true
-	@pkill -f "python -m lead_manager" || true
-	@pkill -f "python -m lead_finder" || true
-	@pkill -f "python -m sdr" || true
-	@pkill -f "uvicorn app:app" || true
-	@echo "✅ All services stopped"
+	@echo "🧹 Stopping all services on ports: $(PORTS_TO_CLEAN)..."
+	@for port in $(PORTS_TO_CLEAN); do \
+		pids=$$(lsof -t -i:$$port 2>/dev/null); \
+		if [ -n "$$pids" ]; then \
+			echo "  -> Found process(es) on port $$port with PIDs: $$pids. Terminating..."; \
+			kill -9 $$pids; \
+		fi; \
+	done
+	@echo "✅ All services stopped."
 
 setup:
 	@echo "📦 Installing dependencies..."
