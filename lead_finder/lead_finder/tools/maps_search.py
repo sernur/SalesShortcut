@@ -16,6 +16,7 @@ class GoogleMapsClient:
     
     def __init__(self):
         self.client = None
+        self._api_key_checked = False
         self._initialize_client()
     
     def _initialize_client(self):
@@ -28,9 +29,22 @@ class GoogleMapsClient:
         try:
             self.client = googlemaps.Client(key=GOOGLE_MAPS_API_KEY)
             logger.info("Successfully initialized Google Maps client")
+            # Test the client with a simple request
+            self.client.geocode("San Francisco")
+            logger.info("Google Maps client tested successfully")
         except Exception as e:
             logger.error(f"Failed to initialize Google Maps client: {e}")
             self.client = None
+    
+    def _ensure_client(self):
+        """Ensure client is initialized, try again if not."""
+        if not self.client and not self._api_key_checked:
+            self._api_key_checked = True
+            # Try to reinitialize in case environment wasn't ready before
+            from ..config import GOOGLE_MAPS_API_KEY as FRESH_API_KEY
+            if FRESH_API_KEY and FRESH_API_KEY != GOOGLE_MAPS_API_KEY:
+                logger.info("Retrying Google Maps client initialization with fresh API key")
+                self._initialize_client()
     
     def _get_place_details(self, place_id: str) -> Dict[str, Any]:
         """Get detailed information for a place."""
@@ -120,6 +134,9 @@ class GoogleMapsClient:
         Returns:
             List of business information dictionaries
         """
+        # Ensure client is available
+        self._ensure_client()
+        
         if not self.client:
             logger.info("Using mock data for business search")
             return self._get_mock_results(city, business_type)
