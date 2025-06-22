@@ -1,6 +1,8 @@
 import json
 import logging
 from typing import Any
+from datetime import datetime
+from pathlib import Path
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
@@ -17,6 +19,22 @@ from .agent import root_agent as lead_manager_adk_agent
 
 logger = logging.getLogger(__name__)
 
+
+# Initialize logging to file
+root_path = Path.cwd()
+log_file = root_path / "lead_finder/lead_finder_agent.log"
+def log_to_file(message: str):
+    """Write log message to file with timestamp"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    with open(log_file, 'a', encoding='utf-8') as f:
+        f.write('\n')
+        f.write(f"[{timestamp}] {message}\n")
+        f.write('\n')
+
+# Clear previous logs and start fresh for this call
+with open(log_file, 'w', encoding='utf-8') as f:
+    f.write(f"=== LEAD FINDER AGENT's LOG - {datetime.now().isoformat()} ===\n\n")
+    
 class LeadManagerAgentExecutor(AgentExecutor):
     """Executes the Lead Manager ADK agent logic in response to A2A requests."""
 
@@ -140,6 +158,9 @@ class LeadManagerAgentExecutor(AgentExecutor):
                 session_id=session_id_for_adk,
                 new_message=adk_content,
             ):
+                log_entry = f" ** - - - - - ** \n [Event] Author: {event.author}, \n Type: {type(event).__name__}, \n Final: {event.is_final_response()}, \n Content: {event.content}"
+                log_to_file(log_entry)
+                
                 if event.is_final_response():
                     if event.content and event.content.parts:
                         text_part = next(

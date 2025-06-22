@@ -1,6 +1,8 @@
+from datetime import datetime
 import json
 import logging
 from typing import Any
+from pathlib import Path
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
@@ -17,6 +19,22 @@ from google.genai import types as genai_types
 from .sdr.agent import sdr_agent
 
 logger = logging.getLogger(__name__)
+
+# Initialize logging to file
+root_path = Path.cwd()
+log_file = root_path / "sdr/sdr_agent.log"
+def log_to_file(message: str):
+    """Write log message to file with timestamp"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+    with open(log_file, 'a', encoding='utf-8') as f:
+        f.write('\n')
+        f.write(f"[{timestamp}] {message}\n")
+        f.write('\n')
+
+# Clear previous logs and start fresh for this call
+with open(log_file, 'w', encoding='utf-8') as f:
+    f.write(f"=== SDR AGENT's LOG - {datetime.now().isoformat()} ===\n\n")
+
 
 class SDRAgentExecutor(AgentExecutor):
     """Executes the SDR ADK agent logic in response to A2A requests."""
@@ -181,6 +199,8 @@ class SDRAgentExecutor(AgentExecutor):
                 session_id=session_id_for_adk,
                 new_message=adk_content,
             ):
+                log_entry = f" ** - - - - - ** \n [Event] Author: {event.author}, \n Type: {type(event).__name__}, \n Final: {event.is_final_response()}, \n Content: {event.content}"
+                log_to_file(log_entry)
                 # Collect and log the raw event
                 all_events.append(event)
                 logger.info(f"Task {context.task_id}: ADK Event: {event}")
