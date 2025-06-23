@@ -65,6 +65,26 @@ module_dir = Path(__file__).parent
 templates_dir = module_dir / "templates"
 static_dir = module_dir / "static"
 
+# Ensure static directory exists (for Cloud Run)
+if not static_dir.exists():
+    logger.warning(f"Static directory not found at {static_dir}, searching alternative paths...")
+    # Try alternative paths for Cloud Run deployment
+    alternative_paths = [
+        Path("/app/sales_shortcut/ui_client/static"),
+        Path("/app/ui_client/static"),
+        module_dir.parent / "ui_client" / "static"
+    ]
+    for alt_path in alternative_paths:
+        if alt_path.exists():
+            static_dir = alt_path
+            logger.info(f"Found static directory at {static_dir}")
+            break
+    else:
+        logger.error(f"Static directory not found in any expected location. Checked: {[str(p) for p in [static_dir] + alternative_paths]}")
+
+logger.info(f"Using static directory: {static_dir}")
+logger.info(f"Using templates directory: {templates_dir}")
+
 # Business Status Enums
 class BusinessStatus(str, Enum):
     FOUND = "found"
@@ -172,7 +192,20 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 templates = Jinja2Templates(directory=str(templates_dir))
-app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+# Mount static files with additional logging
+logger.info(f"Mounting static files from {static_dir} to /static")
+try:
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+    logger.info("Static files mounted successfully")
+except Exception as e:
+    logger.error(f"Failed to mount static files: {e}")
+    # Try to create a minimal static mount as fallback
+    try:
+        from fastapi.responses import FileResponse
+        logger.warning("Creating fallback static file handler")
+    except Exception as fallback_error:
+        logger.error(f"Fallback static handler also failed: {fallback_error}")
 
 def format_currency(value: Optional[float]) -> str:
     """Formats an optional float value as currency."""
@@ -925,6 +958,16 @@ async def read_root(request: Request) -> HTMLResponse:
                 "request": request  # Correct: 'request' is now inside the context
             }
         )
+
+@app.get("/architecture_diagram", response_class=HTMLResponse)
+async def architecture_diagram(request: Request) -> HTMLResponse:
+    """Serves the architecture diagram page."""
+    return templates.TemplateResponse(
+        name="architecture_diagram.html",
+        context={
+            "request": request
+        }
+    )
         
         
 @app.post("/start_lead_finding")
@@ -1246,6 +1289,37 @@ async def health_check():
         "is_running": app_state["is_running"],
         "business_count": len(app_state["businesses"]),
     }
+
+@app.get("/debug/static")
+async def debug_static():
+    """Debug endpoint to check static file configuration."""
+    import os
+    
+    static_files_info = {
+        "static_dir": str(static_dir),
+        "static_dir_exists": static_dir.exists(),
+        "templates_dir": str(templates_dir),
+        "templates_dir_exists": templates_dir.exists(),
+        "working_directory": os.getcwd(),
+        "module_file_location": str(Path(__file__)),
+        "module_dir": str(module_dir)
+    }
+    
+    # List static files if directory exists
+    if static_dir.exists():
+        try:
+            static_files = []
+            for root, dirs, files in os.walk(static_dir):
+                for file in files:
+                    rel_path = os.path.relpath(os.path.join(root, file), static_dir)
+                    static_files.append(rel_path)
+            static_files_info["static_files"] = static_files
+        except Exception as e:
+            static_files_info["static_files_error"] = str(e)
+    else:
+        static_files_info["static_files"] = "Directory does not exist"
+    
+    return static_files_info
 
 if __name__ == "__main__":
     import uvicorn

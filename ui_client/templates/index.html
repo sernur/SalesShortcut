@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SalesShortcut - Lead Generation Platform</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="{{ url_for('static', path='css/style.css') }}" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
 </head>
 <body>
     <div class="container">
@@ -15,6 +15,12 @@
                 <h1>SalesShortcut</h1>
             </div>
             <p class="subtitle">AI-Powered Lead Generation & Management Platform</p>
+            <div class="header-actions">
+                <button onclick="window.open('/architecture_diagram', '_blank')" class="architecture-btn">
+                    <i class="fas fa-project-diagram"></i>
+                    <span class="btn-text">View System Architecture</span>
+                </button>
+            </div>
         </div>
 
         <div class="main-card">

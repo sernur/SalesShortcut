@@ -1,19 +1,19 @@
 {
   "business_data": {
-    "email": null,
-    "city": "San Francisco",
-    "id": "generated_-8496074652768238678",
-    "phone": "4353173849",
-    "phone_number": "4353173849",
-    "status": "found",
+    "name": "Tilden Hotel",
+    "id": "generated_-4787755803179905359",
     "notes": [
       "AgentType.LEAD_FINDER: Successfully discovered business: Tilden Hotel"
     ],
-    "created_at": "2025-06-22T12:28:58.429641",
+    "created_at": "2025-06-23T00:17:07.625975",
+    "phone": "4353173849",
+    "email": null,
     "description": null,
-    "updated_at": "2025-06-22T12:28:58.429643",
-    "name": "Tilden Hotel"
+    "status": "found",
+    "updated_at": "2025-06-23T00:17:07.625976",
+    "city": "San Francisco",
+    "phone_number": "4353173849"
   },
-  "proposal": "Dear Tilden Hotel Team,\n\nOur research indicates the Tilden Hotel offers a distinctive experience, blending historic Art Deco architecture with a prime downtown San Francisco location and a commitment to local art. We propose enhancing your brand's online presence and guest experience through a custom website. This would allow you to showcase the hotel's unique character, history, and artistic focus, while also providing a direct booking engine for commission-free reservations. By highlighting amenities like The Douglas Room and the rooftop terrace with compelling visuals and offering curated local content, we can help attract more direct bookings and enhance your online visibility, strengthening your brand image.\n\nWe're confident our website development services can deliver a modern, engaging online presence that reflects the Tilden Hotel's unique appeal and drives business. Are you available for a brief call to discuss these opportunities?",
+  "proposal": "Dear Tilden Hotel,\n\nRecognizing the Tilden Hotel's reputation as a premier San Francisco destination, especially with its art-focused atmosphere and prime location, we propose a new professional website to drive more direct bookings. A modern, user-friendly website will showcase your unique amenities, including the rooftop terrace and art installations, making it easier for guests to discover and book their stay. By highlighting positive customer reviews and offering seamless online booking, you can increase revenue and build even stronger relationships with your guests.\n\nWe are confident that our services will significantly elevate the Tilden Hotel's online presence and contribute to your continued success. We would welcome the opportunity to discuss how we can create a website that reflects your distinctive brand. Please contact us to schedule a consultation.",
   "extracted_phone": "4353173849"
 }

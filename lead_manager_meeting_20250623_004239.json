@@ -1,0 +1,26 @@
+{
+  "timestamp": "2025-06-23T00:42:39.569060",
+  "data": {
+    "full_meeting_data": {
+      "attendees": [
+        "meinnps@gmail.com",
+        "sales@zemzen.org"
+      ],
+      "description": "Merdan Durdyev wants to meet with the team on June 24 at 10:00 AM",
+      "title": "Meeting with Merdan Durdyev",
+      "end_datetime": "2025-06-24T11:00:00-06:00",
+      "start_datetime": "2025-06-24T10:00:00-06:00",
+      "status": "meeting_request"
+    },
+    "full_email_data": {
+      "date_received": "2025-06-23T00:41:26-06:00",
+      "thread_conversation_history": [],
+      "thread_id": "1979b82d64c7f2c9",
+      "sender_email": "meinnps@gmail.com",
+      "body": "Hi Lexi,\r\nOf course, I want to meet with your team on June 24 at 10:00 AM\r\n\r\nOn Mon, Jun 23, 2025 at 12:38 AM <sales@zemzen.org> wrote:\r\n\r\n> Hi there,\r\n>\r\n> It was a pleasure speaking with you earlier today! As promised, I'm\r\n> following up with a summary of our proposal to develop a professional\r\n> website for the Tilden Hotel.\r\n>\r\n> We understand that you're a unique boutique hotel in the heart of San\r\n> Francisco, and a website is a crucial step in showcasing your\r\n> art-focused ambiance and prime location. We believe a bespoke website\r\n> would allow you to highlight your distinct features like the art\r\n> gallery and rooftop terrace, and even address some of the service\r\n> inconsistencies mentioned in reviews. This will help boost direct\r\n> bookings and elevate your brand image.\r\n>\r\n> Please take a look at this demo website preview:\r\n>\r\n> https://6000-firebase-studio-1750647069045.cluster-aj77uug3sjd4iut4ev6a4jbtf2.cloudworkstations.dev/\r\n>\r\n> What time works for you to arrange a meeting?\r\n>\r\n> Best regards,\r\n> Lexi from ZemZen\r\n> sales@zemzen.org\r\n\nHi Lexi, Of course, I want to meet with your team on June 24 at 10:00 AMOn Mon, Jun 23, 2025 at 12:38 AM &lt;sales@zemzen.org&gt; wrote:Hi there,\r\n\r\nIt was a pleasure speaking with you earlier today! As promised, I&#39;m\r\nfollowing up with a summary of our proposal to develop a professional\r\nwebsite for the Tilden Hotel.\r\n\r\nWe understand that you&#39;re a unique boutique hotel in the heart of San\r\nFrancisco, and a website is a crucial step in showcasing your\r\nart-focused ambiance and prime location. We believe a bespoke website\r\nwould allow you to highlight your distinct features like the art\r\ngallery and rooftop terrace, and even address some of the service\r\ninconsistencies mentioned in reviews. This will help boost direct\r\nbookings and elevate your brand image.\r\n\r\nPlease take a look at this demo website preview:\r\nhttps://6000-firebase-studio-1750647069045.cluster-aj77uug3sjd4iut4ev6a4jbtf2.cloudworkstations.dev/\r\n\r\nWhat time works for you to arrange a meeting?\r\n\r\nBest regards,\r\nLexi from ZemZen\r\nsales@zemzen.org",
+      "sender_name": "Merdan Durdyev",
+      "message_id": "1979b85c224fa779",
+      "subject": "Re: Follow-up on Our Recent Call - Proposal for Tilden Hotel"
+    }
+  }
+}

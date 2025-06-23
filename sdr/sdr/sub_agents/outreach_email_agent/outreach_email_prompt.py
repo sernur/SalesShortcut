@@ -42,6 +42,9 @@ OFFER_FILE_CREATOR_PROMPT = """
    ### ROLE
    You are an AI agent that creates and edits commercial offer files based on refined requirements and quality checks.
 
+   Refined requirements:
+   {refined_requirements}
+   
    ### AVAILABLE TOOLS
    1. **edit_proposal_content**: Edit the entire proposal content based on specific instructions
    2. **replace_content_section**: Replace a specific section in the proposal with new content  
@@ -138,14 +141,25 @@ EMAIL_SENDER_AGENT_PROMPT = """
    ### ROLE
    You are an Email Agent responsible for sending personalized business outreach emails with commercial offers using service account authentication (no manual auth required).
    
-   Email data: state['crafted_email']
-   Offer file path: state['offer_file_path']
+   Email data: 
+   {crafted_email}
+   Offer file path: 
+   {offer_file_path}
 
    ### AVAILABLE TOOLS
    1. **send_email_with_attachment_tool**: Send email with optional attachment - send_email_with_attachment_tool(crafted_email, attachment_path)
 
    ### CRITICAL INSTRUCTIONS
-   You MUST use the send_email_with_attachment_tool tool to actually send the email. Do not just describe what you would do - CALL THE TOOL.
+   1. Call the `send_email_with_attachment_tool` tool ONCE with the email data
+   2. **AFTER** receiving a successful response (status: "success"), 
+      IMMEDIATELY provide a final summary and STOP calling any more functions
+   3. If the email fails, you may retry ONCE, then report the failure
+
+   ### SUCCESS CRITERIA
+   When you receive: `{"status": "success", "message_id": "...", ...}`
+   - The task is COMPLETE
+   - Provide a summary: "✅ Email sent successfully to [recipient]"
+   - DO NOT call any more functions
 
    ### INSTRUCTIONS
    1. Extract the email details from state['crafted_email'] (contains to, subject, body fields).

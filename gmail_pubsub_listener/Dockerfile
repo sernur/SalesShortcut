@@ -10,8 +10,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code
 COPY gmail_pubsub_listener/ ./gmail_pubsub_listener/
 COPY common/ ./common/
-COPY .env .env
-COPY .secrets/ ./.secrets/
+
+# Create empty .env and .secrets directory (will be overridden by environment variables)
+RUN touch .env && mkdir -p .secrets
 
 # Set Python path
 ENV PYTHONPATH="${PYTHONPATH}:/app"

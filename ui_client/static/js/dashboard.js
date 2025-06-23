@@ -529,29 +529,8 @@ class DashboardManager {
     }
     
     showErrorToast(message) {
-        // Create toast notification
-        const toast = document.createElement('div');
-        toast.className = 'error-toast';
-        toast.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: #ef4444;
-            color: white;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            z-index: 1001;
-            max-width: 400px;
-            font-weight: 500;
-        `;
-        toast.textContent = message;
-        
-        document.body.appendChild(toast);
-        
-        setTimeout(() => {
-            toast.remove();
-        }, 5000);
+        // Error toasts are muted - only log to console
+        console.log('Error toast muted:', message);
     }
     
     updateConnectionStatus(isConnected) {
@@ -950,6 +929,12 @@ class DashboardManager {
 
 // Global toast function
 function showToast(message, type = 'info') {
+    // Mute error and warning toasts - only log to console
+    if (type === 'error' || type === 'warning') {
+        console.log(`${type.charAt(0).toUpperCase() + type.slice(1)} toast muted:`, message);
+        return;
+    }
+    
     const toast = document.createElement('div');
     toast.className = `toast toast-${type}`;
     
@@ -957,12 +942,6 @@ function showToast(message, type = 'info') {
     switch(type) {
         case 'success':
             backgroundColor = '#10b981';
-            break;
-        case 'error':
-            backgroundColor = '#ef4444';
-            break;
-        case 'warning':
-            backgroundColor = '#f59e0b';
             break;
         default:
             backgroundColor = '#3b82f6';

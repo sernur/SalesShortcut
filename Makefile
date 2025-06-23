@@ -20,7 +20,7 @@ ifneq (,$(wildcard ./.env))
     export
 endif
 
-.PHONY: help deploy_local deploy_cloud test_local clean setup check_env grant_public
+.PHONY: help deploy_local deploy_cloud test_local clean setup check_env grant_public update_constants
 
 help:
 	@echo "SalesShortcut A2A Project - Available Commands:"
@@ -32,6 +32,7 @@ help:
 	@echo "  make setup                      - Install Python dependencies"
 	@echo "  make check_env                  - Check environment variables"
 	@echo "  make grant_public               - Grant anonymous (public) access to all Cloud Run services"
+	@echo "  make update_constants           - Update environment variables for already deployed services"
 	@echo "  make help                       - Show this help"
 	@echo ""
 	@echo "Environment Variables:"
@@ -89,6 +90,11 @@ grant_public:
 	@chmod +x ./grant_public_access.sh
 	@./grant_public_access.sh
 
+update_constants:
+	@echo "🔄 Updating environment variables for already deployed services..."
+	@chmod +x ./update_deployed_constants.sh
+	@./update_deployed_constants.sh
+
 PORTS_TO_CLEAN = 8000 8080 8081 8082 8083 8084
 
 clean:
@@ -100,6 +106,12 @@ clean:
 			kill -9 $$pids; \
 		fi; \
 	done
+	@echo "🧹 Stopping Gmail listener processes..."
+	@pids=$$(pgrep -f "gmail_listener_service" 2>/dev/null); \
+	if [ -n "$$pids" ]; then \
+		echo "  -> Found Gmail listener process(es) with PIDs: $$pids. Terminating..."; \
+		kill -9 $$pids; \
+	fi
 	@echo "✅ All services stopped."
 
 setup:

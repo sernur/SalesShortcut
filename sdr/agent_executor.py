@@ -151,13 +151,13 @@ class SDRAgentExecutor(AgentExecutor):
                         state={
                             "business_data": business_data,
                             # "call_result": '',
-                            "call_category": '',
-                            # "crafted_email": '',
-                            # "engagement_saved_result": '',
-                            # "email_sent_result": '',
-                            # "refined_requirements": '',
+                            # "call_category": '',
+                            "crafted_email": '',
+                            "engagement_saved_result": '',
+                            "email_sent_result": '',
+                            "refined_requirements": '',
                             # "draft_proposal": '',
-                            # "offer_file_path": '',
+                            "offer_file_path": '',
                             "proposal": '',
                             # "research_result": '',
                             "website_preview_link": '',
@@ -254,24 +254,43 @@ class SDRAgentExecutor(AgentExecutor):
                             # Otherwise track tool as completed
                             self._completed_function_calls.add(function_call_id)
                 
-                # Capture function call results (like phone_call)
-                if event.content and event.content.parts:
-                    for part in event.content.parts:
-                        # Look for function calls
-                        if hasattr(part, 'function_call') and part.function_call:
                             function_name = part.function_call.name
                             logger.info(f"Task {context.task_id}: Function call detected: {function_name}")
                             
-                            # Capture phone call results
-                            if function_name == "phone_call":
-                                phone_call_result = part.function_call.args
-                                logger.info(f"Task {context.task_id}: Phone call result captured")
+                            # Update session state with tool execution results for LLM context
+                            try:
+                                # Capture phone call results
+                                if function_name == "phone_call":
+                                    phone_call_result = part.function_call.args
+                                    session.state["call_result"] = "completed"
+                                    session.state["call_category"] = phone_call_result.get("category", "unknown")
+                                    logger.info(f"Task {context.task_id}: Phone call result captured and stored in session")
+                                    
+                                # Look for final SDR results
+                                elif function_name == "final_sdr_results":
+                                    sdr_result = part.function_call.args.get("sdr_result", {})
+                                    final_result["sdr_result"] = sdr_result
+                                    session.state["sdr_completed"] = True
+                                    logger.info(f"Task {context.task_id}: SDR process completed for {business_name}")
                                 
-                            # Look for final SDR results
-                            elif function_name == "final_sdr_results":
-                                sdr_result = part.function_call.args.get("sdr_result", {})
-                                final_result["sdr_result"] = sdr_result
-                                logger.info(f"Task {context.task_id}: SDR process completed for {business_name}")
+                                # Track other common tool executions
+                                elif function_name == "gmail_service_account_tool":
+                                    session.state["email_sent_result"] = "completed"
+                                    logger.info(f"Task {context.task_id}: Email tool execution tracked")
+                                
+                                elif function_name == "create_pdf_offer":
+                                    session.state["offer_created"] = True
+                                    logger.info(f"Task {context.task_id}: PDF offer creation tracked")
+                                
+                                # Update session to reflect tool completion
+                                await self._adk_runner.session_service.update_session(
+                                    app_name=self._adk_runner.app_name,
+                                    user_id="a2a_user", 
+                                    session_id=session_id_for_adk,
+                                    state=session.state
+                                )
+                            except Exception as e:
+                                logger.warning(f"Task {context.task_id}: Failed to update session state: {e}")
                         
                         # Also capture text responses
                         elif hasattr(part, "text") and part.text:

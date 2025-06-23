@@ -127,10 +127,16 @@ def send_sdr_update_to_ui(business_data: dict, email_sent_result: Optional[dict]
             response = client.post(callback_endpoint, json=payload, timeout=10.0)
             response.raise_for_status()
             logger.info(f"Successfully posted update for {data_for_ui.get('name')} to UI. Status: {response.status_code}")
+            return True
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error {e.response.status_code} posting to UI client: {e.response.text}")
+        return False
     except httpx.RequestError as e:
-        logger.error(f"Error sending POST request to UI client at {e.request.url}: {e}")
+        logger.error(f"Network error sending POST request to UI client at {e.request.url}: {e}")
+        return False
     except Exception as e:
-        logger.error(f"An unexpected error occurred while posting to the UI client: {e}")
+        logger.error(f"Unexpected error posting to UI client: {e}")
+        return False
 
 
 
@@ -160,19 +166,18 @@ async def post_results_callback(callback_context: CallbackContext) -> Optional[g
             return value # Return the original string if parsing fails
 
     
-    business_data = safe_json_parse(context_state.get('business_data'), 'no_business_data')
-    if business_data is None and 'no_business_data' in context_state:
+    business_data = safe_json_parse(context_state.get('business_data'), 'business_data')
+    if business_data is None:
         logger.warning(f"SDR [Callback] No business data found in state for agent: {agent_name}")
         return None
 
-    # UPDATED: Try to get email_sent_result first, then fall back to crafted_email
-    email_sent_result = safe_json_parse(context_state.get('email_sent_result'), 'no_email_sent_result')
-    
+    email_sent_result = safe_json_parse(context_state.get('email_sent_result'), 'email_sent_result')
+
     # If email_sent_result doesn't exist, try to construct it from crafted_email
     if email_sent_result is None:
-        crafted_email = safe_json_parse(context_state.get('crafted_email'), 'no_crafted_email')
+        crafted_email = safe_json_parse(context_state.get('crafted_email'), 'crafted_email')
         if crafted_email:
-            # Create the expected structure
+            # Create the expected structure for UI callback
             email_sent_result = {
                 'email_sent_result': {
                     'status': 'success',
@@ -182,16 +187,27 @@ async def post_results_callback(callback_context: CallbackContext) -> Optional[g
             }
             logger.info("SDR [Callback] Constructed email_sent_result from crafted_email")
         else:
-            logger.warning(f"SDR [Callback] No email data found in state for agent: {agent_name}")
-            return None
-    
+            logger.info(f"SDR [Callback] No email data found in state for agent: {agent_name}, proceeding with business data only")
+
     logger.info(f"SDR [Callback] Business data and email sent result parsed successfully.")
-    
+
+    # Send UI update with the parsed data
+    ui_update_success = False
     if email_sent_result and 'email_sent_result' in email_sent_result:
         # Pass the inner dictionary, which contains 'crafted_email'
-        send_sdr_update_to_ui(business_data, email_sent_result['email_sent_result'])
+        ui_update_success = send_sdr_update_to_ui(business_data, email_sent_result['email_sent_result'])
+        if ui_update_success:
+            logger.info(f"SDR [Callback] UI update sent successfully for business: {business_data.get('name')}")
+        else:
+            logger.error(f"SDR [Callback] Failed to send UI update for business: {business_data.get('name')}")
     else:
         logger.warning("SDR [Callback] 'email_sent_result' key not found in the parsed object.")
+        # Still try to send UI update with business data only
+        ui_update_success = send_sdr_update_to_ui(business_data, None)
+        if ui_update_success:
+            logger.info(f"SDR [Callback] UI update sent successfully without email data for business: {business_data.get('name')}")
+        else:
+            logger.error(f"SDR [Callback] Failed to send UI update without email data for business: {business_data.get('name')}")
 
     try:
         # Saving artifacts

@@ -21,13 +21,14 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+import common.config as config
 
 # Configuration
 PROJECT_ID = os.getenv("PROJECT_ID")
 SUBSCRIPTION_NAME = os.getenv("SUBSCRIPTION_NAME", "gmail-notifications-pull")
 SALES_EMAIL = os.getenv("SALES_EMAIL")
 SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE", ".secrets/sales-automation-service.json")
-LEAD_MANAGER_URL = os.getenv("LEAD_MANAGER_URL", "http://localhost:8082")
+LEAD_MANAGER_URL = os.getenv("LEAD_MANAGER_URL", config.DEFAULT_LEAD_MANAGER_URL).rstrip("/")
 CRON_INTERVAL = 30  # seconds
 
 # Set up logging

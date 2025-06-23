@@ -30,15 +30,15 @@ from bs4 import BeautifulSoup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class SalesShortcutTemplate:
-    """Custom page template for SalesShortcut branding.
+class ZemZenTemplate:
+    """Custom page template for ZemZen branding.
 
     This class defines the visual layout for each page of the PDF, including a
     gradient background, a white content card, and a branded header/footer.
     """
 
     def __init__(self, doc):
-        """Initializes the SalesShortcutTemplate.
+        """Initializes the ZemZenTemplate.
 
         Args:
             doc: The ReportLab SimpleDocTemplate instance.
@@ -119,7 +119,7 @@ class SalesShortcutTemplate:
         canvas.roundRect(card_x, card_y, card_width, card_height, 8, fill=1, stroke=1)
 
     def _draw_header(self, canvas, width, height):
-        """Draws the SalesShortcut header on the first page.
+        """Draws the ZemZen header on the first page.
 
         Args:
             canvas: The ReportLab canvas object.
@@ -130,12 +130,12 @@ class SalesShortcutTemplate:
         canvas.setFillColor(white)
 
         logo_y = height - 1.5*cm
-        canvas.drawCentredString(width/2, logo_y, "🚀 ZemZen Web Solutions")
+        canvas.drawCentredString(width/2, logo_y, "🚀 ZemZen")
 
         canvas.setFont("Helvetica", 14)
         canvas.setFillColor(colors.Color(1, 1, 1, 0.9))
-        canvas.drawCentredString(width/2, logo_y - 0.6*cm, "\n AI-Powered Lead Generation & Management Proposal\n")
-        canvas.drawCentredString(width/2, logo_y - 0.9*cm, "\nPrepared by BrightWeb Studio")
+        canvas.drawCentredString(width/2, logo_y - 0.6*cm, "AI-Powered Lead Generation & Management Proposal \n")
+        canvas.drawCentredString(width/2, logo_y - 0.9*cm, "\n Prepared by BrightWeb Studio")
 
     def _draw_footer(self, canvas, width, height):
         """Draws the page number footer on all pages.
@@ -174,8 +174,8 @@ class MarkdownToPDFConverter:
 
         custom_styles = {
             'CustomTitle': ParagraphStyle(
-                'CustomTitle', parent=styles['Heading1'], fontSize=22, spaceAfter=34,
-                spaceBefore=16, textColor=primary_color, fontName='Helvetica-Bold',
+                'CustomTitle', parent=styles['Heading1'], fontSize=22, spaceAfter=16,
+                spaceBefore=8, textColor=primary_color, fontName='Helvetica-Bold',
                 alignment=TA_LEFT, leading=28
             ),
             'CustomHeading1': ParagraphStyle(
@@ -425,7 +425,7 @@ def create_sales_proposal_pdf(markdown_offer: str) -> str:
             bottomMargin=2.8*cm,
         )
 
-        template_drawer = SalesShortcutTemplate(doc)
+        template_drawer = ZemZenTemplate(doc)
 
         converter = MarkdownToPDFConverter()
         story = converter.convert_markdown_to_story(markdown_offer)

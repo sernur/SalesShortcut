@@ -220,19 +220,30 @@ def send_email(to_email: str, subject: str, body: str, attachment_path: Optional
             "message": f"Failed to send email from {SALES_EMAIL} to {to_email}"
         }
 
-def send_email_with_attachment(crafted_email: dict[str, Any], attachment_path: Optional[str] = None) -> dict[str, Any]:
+def send_email_with_attachment(crafted_email: dict[str, Any], attachment_path: Optional[str] = None, tool_context=None) -> dict[str, Any]:
     """
     Tool function to send email with optional attachment.
 
     Args:
         crafted_email: dict containing email details with keys 'to', 'subject', and 'body'
         attachment_path: Optional path to attachment file
+        tool_context: Tool execution context to check state
 
     Returns:
         dict containing send result with status and message/error info
     """
     logger.info(f"[TOOL] Crafted email received: {crafted_email}")
     logger.info(f"[TOOL] Attachment path received: {attachment_path}")
+    
+    # Check if email was already sent successfully (similar to human_creation tool pattern)
+    try:
+        existing_email_result = tool_context.state.get("email_sent_result", "") if tool_context else ""
+    except Exception:
+        existing_email_result = None
+    
+    if existing_email_result and isinstance(existing_email_result, dict) and existing_email_result.get("status") == "success":
+        logger.info(f"Skipping email send: email already sent successfully: {existing_email_result}")
+        return existing_email_result
     
     # Ensure crafted_email has required fields
     if not crafted_email or not isinstance(crafted_email, dict):
@@ -256,6 +267,16 @@ def send_email_with_attachment(crafted_email: dict[str, Any], attachment_path: O
         }
     
     logger.info(f"[TOOL] Calling send_email with: to={to_email}, subject='{subject}', body_length={len(body)}, attachment={attachment_path}")
-    return send_email(to_email, subject, body, attachment_path)
+    result = send_email(to_email, subject, body, attachment_path)
+    
+    # Store result in state to prevent re-execution if successful
+    if tool_context and result.get("status") == "success":
+        try:
+            tool_context.state["email_sent_result"] = result
+            logger.info("Stored successful email result in state to prevent re-execution")
+        except Exception as e:
+            logger.warning(f"Could not store email result in state: {e}")
+    
+    return result
 
 send_email_with_attachment_tool = FunctionTool(func=send_email_with_attachment)

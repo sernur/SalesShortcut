@@ -1,11 +1,20 @@
 #!/bin/bash
 
 # Exit immediately if a command exits with a non-zero status.
+# Exit immediately if a command exits with a non-zero status.
 set -e
 
+# Load root .env (global environment variables) if present
+if [ -f .env ]; then
+  echo "Sourcing root .env for environment variables..."
+  # shellcheck source=/dev/null
+  set -o allexport
+  source .env
+  set +o allexport
+fi
 # --- Configuration ---
-export PROJECT_ID="${PROJECT_ID:-salesshortcut}" # Uses env var $PROJECT_ID if set, otherwise the default
-export REGION="${REGION:-us-central1}"                 # Uses env var $REGION if set, otherwise the default
+export PROJECT_ID="${PROJECT_ID:-${CLOUD_PROJECT_ID:-salesshortcut}}" # Uses env var $PROJECT_ID, or CLOUD_PROJECT_ID, or default
+export REGION="${REGION:-${CLOUD_PROJECT_REGION:-us-central1}}"       # Uses env var $REGION, or CLOUD_PROJECT_REGION, or default
 export REPOSITORY_NAME="sales-shortcut"
 
 # Derived Artifact Registry path prefix
@@ -31,6 +40,56 @@ export LEAD_MANAGER_IMAGE_TAG="${AR_PREFIX}/lead-manager:latest"
 export SDR_IMAGE_TAG="${AR_PREFIX}/sdr:latest"
 export GMAIL_LISTENER_IMAGE_TAG="${AR_PREFIX}/gmail-listener:latest"
 export UI_CLIENT_IMAGE_TAG="${AR_PREFIX}/ui-client:latest"
+ 
+# Helper: parse .env files and construct comma-separated KEY=VALUE pairs for gcloud run
+get_env_vars_string() {
+  local service_name="$1"
+  local pairs=""
+  # Include root .env variables first
+  # shellcheck disable=SC2154
+  if [ -f .env ]; then
+    while IFS='=' read -r key raw_val; do
+      [[ "$key" =~ ^\s*# ]] && continue
+      key=$(echo "$key" | xargs)
+      [[ -z "$key" ]] && continue
+      raw_val=$(echo "$raw_val" | xargs)
+      # strip surrounding quotes
+      if [[ "$raw_val" =~ ^\".*\"$ ]]; then
+        val="${raw_val:1:-1}"
+      else
+        val="$raw_val"
+      fi
+      pairs+="${key}=${val},"
+    done < <(grep -v '^\s*#' .env | grep .)
+  fi
+  # Service-specific .env
+  local env_file=""
+  case "$service_name" in
+    lead-finder)    env_file="lead_finder/.env";;
+    lead-manager)   env_file="lead_manager/.env";;
+    sdr)            env_file="sdr/.env";;
+    gmail-listener) env_file="gmail_pubsub_listener/.env";;
+    ui-client)      env_file=".env";;
+  esac
+  if [ -n "$env_file" ] && [ -f "$env_file" ]; then
+    while IFS='=' read -r key raw_val; do
+      [[ "$key" =~ ^\s*# ]] && continue
+      key=$(echo "$key" | xargs)
+      [[ -z "$key" ]] && continue
+      raw_val=$(echo "$raw_val" | xargs)
+      if [[ "$raw_val" =~ ^\".*\"$ ]]; then
+        val="${raw_val:1:-1}"
+      else
+        val="$raw_val"
+      fi
+      # remove duplicate
+      pairs=$(echo "$pairs" | sed -E "s/${key}=[^,]*,?//g")
+      pairs+="${key}=${val},"
+    done < <(grep -v '^\s*#' "$env_file" | grep .)
+  fi
+  # trim trailing comma
+  echo "${pairs%,}"
+}
 
 # Check if PROJECT_ID is set
 if [ "$PROJECT_ID" == "your-gcp-project-id" ]; then
@@ -86,12 +145,14 @@ echo "Getting latest image digest for Lead Finder..."
 LEAD_FINDER_DIGEST=$(gcloud artifacts docker images list $AR_PREFIX/lead-finder --format="value(DIGEST)" --limit=1 --project=$PROJECT_ID)
 echo "Using image digest: $LEAD_FINDER_DIGEST"
 echo "Deploying Lead Finder service ($LEAD_FINDER_SERVICE_NAME)..."
+# Prepare environment variables for Lead Finder (root and service .env)
+ENV_VARS=$(get_env_vars_string "lead-finder")
 gcloud run deploy $LEAD_FINDER_SERVICE_NAME \
     --image=$AR_PREFIX/lead-finder@$LEAD_FINDER_DIGEST \
     --platform managed \
     --region $REGION \
     --allow-unauthenticated \
-    --set-env-vars="GOOGLE_API_KEY=$GOOGLE_API_KEY,GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY" \
+    --set-env-vars="$ENV_VARS" \
     --project=$PROJECT_ID
 
 # Step 1.3: Get Service URL
@@ -115,12 +176,15 @@ echo "Getting latest image digest for Lead Manager..."
 LEAD_MANAGER_DIGEST=$(gcloud artifacts docker images list $AR_PREFIX/lead-manager --format="value(DIGEST)" --limit=1 --project=$PROJECT_ID)
 echo "Using image digest: $LEAD_MANAGER_DIGEST"
 echo "Deploying Lead Manager service ($LEAD_MANAGER_SERVICE_NAME)..."
+# Prepare environment variables for Lead Manager (root, service .env, and peer URL)
+ENV_VARS=$(get_env_vars_string "lead-manager")
+ENV_VARS="${ENV_VARS},LEAD_FINDER_SERVICE_URL=$LEAD_FINDER_SERVICE_URL"
 gcloud run deploy $LEAD_MANAGER_SERVICE_NAME \
     --image=$AR_PREFIX/lead-manager@$LEAD_MANAGER_DIGEST \
     --platform managed \
     --region $REGION \
     --allow-unauthenticated \
-    --set-env-vars="GOOGLE_API_KEY=$GOOGLE_API_KEY,GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY,LEAD_FINDER_SERVICE_URL=$LEAD_FINDER_SERVICE_URL" \
+    --set-env-vars="$ENV_VARS" \
     --project=$PROJECT_ID
 
 # Step 2.3: Get Service URL
@@ -144,12 +208,15 @@ echo "Getting latest image digest for SDR..."
 SDR_DIGEST=$(gcloud artifacts docker images list $AR_PREFIX/sdr --format="value(DIGEST)" --limit=1 --project=$PROJECT_ID)
 echo "Using image digest: $SDR_DIGEST"
 echo "Deploying SDR service ($SDR_SERVICE_NAME)..."
+# Prepare environment variables for SDR (root, service .env, and peer URL)
+ENV_VARS=$(get_env_vars_string "sdr")
+ENV_VARS="${ENV_VARS},LEAD_MANAGER_SERVICE_URL=$LEAD_MANAGER_SERVICE_URL"
 gcloud run deploy $SDR_SERVICE_NAME \
     --image=$AR_PREFIX/sdr@$SDR_DIGEST \
     --platform managed \
     --region $REGION \
     --allow-unauthenticated \
-    --set-env-vars="GOOGLE_API_KEY=$GOOGLE_API_KEY,GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY,LEAD_MANAGER_SERVICE_URL=$LEAD_MANAGER_SERVICE_URL" \
+    --set-env-vars="$ENV_VARS" \
     --project=$PROJECT_ID
 
 # Step 3.3: Get Service URL
@@ -173,12 +240,15 @@ echo "Getting latest image digest for Gmail Listener..."
 GMAIL_LISTENER_DIGEST=$(gcloud artifacts docker images list $AR_PREFIX/gmail-listener --format="value(DIGEST)" --limit=1 --project=$PROJECT_ID)
 echo "Using image digest: $GMAIL_LISTENER_DIGEST"
 echo "Deploying Gmail Listener service ($GMAIL_LISTENER_SERVICE_NAME)..."
+# Prepare environment variables for Gmail Listener (root, service .env, and correct peer URL)
+ENV_VARS=$(get_env_vars_string "gmail-listener")
+ENV_VARS="${ENV_VARS},LEAD_MANAGER_URL=$LEAD_MANAGER_SERVICE_URL"
 gcloud run deploy $GMAIL_LISTENER_SERVICE_NAME \
     --image=$AR_PREFIX/gmail-listener@$GMAIL_LISTENER_DIGEST \
     --platform managed \
     --region $REGION \
     --allow-unauthenticated \
-    --set-env-vars="GOOGLE_API_KEY=$GOOGLE_API_KEY,GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY,LEAD_MANAGER_SERVICE_URL=$LEAD_MANAGER_SERVICE_URL" \
+    --set-env-vars="$ENV_VARS" \
     --project=$PROJECT_ID
 
 # Step 4.3: Get Service URL
@@ -202,12 +272,15 @@ echo "Getting latest image digest for UI Client..."
 UI_CLIENT_DIGEST=$(gcloud artifacts docker images list $AR_PREFIX/ui_client --format="value(DIGEST)" --limit=1 --project=$PROJECT_ID)
 echo "Using image digest: $UI_CLIENT_DIGEST"
 echo "Deploying UI Client service ($UI_CLIENT_SERVICE_NAME)..."
+# Prepare environment variables for UI Client (root, service .env, and peer URLs)
+ENV_VARS=$(get_env_vars_string "ui-client")
+ENV_VARS="${ENV_VARS},LEAD_FINDER_SERVICE_URL=$LEAD_FINDER_SERVICE_URL,LEAD_MANAGER_SERVICE_URL=$LEAD_MANAGER_SERVICE_URL,SDR_SERVICE_URL=$SDR_SERVICE_URL,GMAIL_LISTENER_SERVICE_URL=$GMAIL_LISTENER_SERVICE_URL"
 gcloud run deploy $UI_CLIENT_SERVICE_NAME \
     --image=$AR_PREFIX/ui_client@$UI_CLIENT_DIGEST \
     --platform managed \
     --region $REGION \
     --allow-unauthenticated \
-    --set-env-vars="GOOGLE_API_KEY=$GOOGLE_API_KEY,GOOGLE_MAPS_API_KEY=$GOOGLE_MAPS_API_KEY,LEAD_FINDER_SERVICE_URL=$LEAD_FINDER_SERVICE_URL,LEAD_MANAGER_SERVICE_URL=$LEAD_MANAGER_SERVICE_URL,SDR_SERVICE_URL=$SDR_SERVICE_URL,GMAIL_LISTENER_SERVICE_URL=$GMAIL_LISTENER_SERVICE_URL" \
+    --set-env-vars="$ENV_VARS" \
     --project=$PROJECT_ID
 
 # Step 5.3: Get Service URL
@@ -215,6 +288,32 @@ export UI_CLIENT_SERVICE_URL=$(gcloud run services describe $UI_CLIENT_SERVICE_N
   echo "UI Client URL: $UI_CLIENT_SERVICE_URL"
   echo "---"
 fi
+
+# --- Update services with UI Client URL ---
+echo "Updating Lead Finder service with UI_CLIENT_SERVICE_URL..."
+gcloud run services update $LEAD_FINDER_SERVICE_NAME \
+    --update-env-vars "UI_CLIENT_SERVICE_URL=$UI_CLIENT_SERVICE_URL" \
+    --platform managed \
+    --region $REGION \
+    --project $PROJECT_ID
+echo "Updating Lead Manager service with UI_CLIENT_SERVICE_URL..."
+gcloud run services update $LEAD_MANAGER_SERVICE_NAME \
+    --update-env-vars "UI_CLIENT_SERVICE_URL=$UI_CLIENT_SERVICE_URL" \
+    --platform managed \
+    --region $REGION \
+    --project $PROJECT_ID
+echo "Updating SDR service with UI_CLIENT_SERVICE_URL..."
+gcloud run services update $SDR_SERVICE_NAME \
+    --update-env-vars "UI_CLIENT_SERVICE_URL=$UI_CLIENT_SERVICE_URL" \
+    --platform managed \
+    --region $REGION \
+    --project $PROJECT_ID
+echo "Updating Gmail Listener service with UI_CLIENT_SERVICE_URL..."
+gcloud run services update $GMAIL_LISTENER_SERVICE_NAME \
+    --update-env-vars "UI_CLIENT_SERVICE_URL=$UI_CLIENT_SERVICE_URL" \
+    --platform managed \
+    --region $REGION \
+    --project $PROJECT_ID
 
 # Grant public access to deployed services
 echo "Granting public (unauthenticated) access to deployed services..."

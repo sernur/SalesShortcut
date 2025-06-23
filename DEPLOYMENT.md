@@ -125,26 +125,20 @@ print(result)
 ```
   Test create_meeting_with_lead  with specific date/time:
 
-  # Test meeting creation with preferred date/time
+# Test the creation file
 ```bash
 python -c "
-import asyncio
-from lead_manager.lead_manager.tools.calendar_utils import create_meeting_with_lead
-
-# Notice the attendees parameter is now a simple list of strings
-result = asyncio.run(create_meeting_with_lead(
-    lead_name='Merdan Durdyyev',
-    lead_email='meinnps@gmail.com',
-    meeting_subject='Product Demo',
-    duration_minutes=30,
-    preferred_date='2025-06-27', # Updated date to be in the future
-    preferred_time='14:00',
-    attendees=[ 
-      'another_colleague@zemzen.org',
-      'a_third_person@zemzen.org'
-   ]
-))
-print(result)
+import sys
+import os
+sys.path.append('/Users/xskills/Development/Python/Hackathons/SalesShortcut')
+os.chdir('/Users/xskills/Development/Python/Hackathons/SalesShortcut/sdr/sdr/sub_a
+gents/outreach_email_agent/tools')
+from create_pdf_offer import create_sales_proposal_pdf
+sys.path.append('/Users/xskills/Development/Python/Hackathons/SalesShortcut/sdr/sd
+r/sub_agents/outreach_email_agent/sub_agents/specification_creator')
+from spec_template import SPEC_MARKDOWN_TEMPLATE
+result = create_sales_proposal_pdf(SPEC_MARKDOWN_TEMPLATE)
+print(f'PDF created at: {result}')
 "
 ```
 
