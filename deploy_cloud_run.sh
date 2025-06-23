@@ -105,7 +105,7 @@ if [ -z "$GOOGLE_API_KEY" ]; then
 fi
 
 # Set Google Maps API key from local env if available
-export GOOGLE_MAPS_API_KEY="${GOOGLE_MAPS_API_KEY:-AIzaSyBdsjrHYHzFgbcG0ASBn2Mji1CnhRAz3h8}"
+export GOOGLE_MAPS_API_KEY="${GOOGLE_MAPS_API_KEY:-}"
 
 # --- Pre-flight Checks ---
 echo "Using Project ID: $PROJECT_ID"
