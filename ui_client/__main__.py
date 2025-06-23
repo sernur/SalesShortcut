@@ -36,8 +36,8 @@ def main():
     parser.add_argument(
         "--port",
         type=int,
-        default=config.DEFAULT_UI_CLIENT_PORT,
-        help=f"Port to run the UI Client on (default: {config.DEFAULT_UI_CLIENT_PORT})"
+        default=config.UI_CLIENT_SERVICE_NAME,
+        help=f"Port to run the UI Client on (default: {config.UI_CLIENT_SERVICE_NAME})"
     )
     parser.add_argument(
         "--host",

@@ -2,16 +2,23 @@
 
 A comprehensive AI-powered Sales Development Representative (SDR) system built with multi-agent architecture for automated lead generation, research, proposal generation, and outreach.
 
+## 🎯 Project Overview
+
+SalesShortcut is a sales automation and engagement platform that **finds, creates, and converts leads** through intelligent AI agents. The system automatically discovers potential business leads, researches their needs, creates personalized proposals, and manages outreach campaigns including phone calls and email communication.
+
 ## 🏗️ Architecture
 
-SalesShortcut consists of 4 specialized microservices working together:
+![Architecture Diagram](./assets/architecture.svg)
+
+SalesShortcut consists of 5 specialized microservices working together:
 
 ### Core Services
 
-- **🔍 Lead Finder** - Discovers potential business leads in specified cities using Google Maps and location-based search
-- **🧠 SDR Agent** - Main orchestrator conducting research, proposal generation, and outreach (includes phone calls and email)
-- **📋 Lead Manager** - Manages lead data and tracks conversion status
-- **🖥️ UI Client** - Web dashboard for monitoring and controlling the entire system
+- **🔍 [Lead Finder](./lead_finder/README.md)** - Discovers potential business leads in specified cities using Google Maps and location-based search
+- **🧠 [SDR Agent](./sdr/README.md)** - Main orchestrator conducting research, proposal generation, and outreach (includes phone calls and email)
+- **📋 [Lead Manager](./lead_manager/README.md)** - Manages lead data, tracks conversion status, and handles meeting scheduling
+- **🖥️ [UI Client](./ui_client/README.md)** - Web dashboard for monitoring and controlling the entire system
+- **📧 [Gmail PubSub Service](./gmail_pubsub_listener/README.md)** - Handles incoming email responses and lead engagement tracking
 
 ### Agent Workflow
 
@@ -29,6 +36,7 @@ graph TD
     I --> K[Email Tool]
     H --> L[Lead Manager]
     L --> M[Calendar Assistant]
+    N[Gmail PubSub] --> L
 ```
 
 ## ✨ Key Features
@@ -68,7 +76,7 @@ graph TD
 
 ## 📋 Prerequisites
 
-- Python 3.8+
+- Python 3.9+
 - Google Cloud Project with BigQuery enabled
 - API Keys:
   - Google API Key (for Gemini LLM)
@@ -83,7 +91,7 @@ graph TD
 ```bash
 git clone <repository-url>
 cd SalesShortcut
-cp .env.example .env
+cp config.template .env
 # Edit .env with your API keys
 ```
 
@@ -95,6 +103,7 @@ Update `.env` with your API credentials:
 # Required
 GOOGLE_API_KEY=your_google_api_key_here
 GOOGLE_MAPS_API_KEY=your_maps_api_key_here
+GOOGLE_CLOUD_PROJECT=your_gcp_project_id_here
 
 # For Voice Calls
 ELEVENLABS_API_KEY=your_elevenlabs_key_here
@@ -114,7 +123,15 @@ ANTHROPIC_API_KEY=your_anthropic_key_here
 ### 3. Install Dependencies
 
 ```bash
+# Install all dependencies
 pip install -r requirements.txt
+
+# Or install individual service dependencies
+pip install -r lead_finder/requirements.txt
+pip install -r lead_manager/requirements.txt
+pip install -r sdr/requirements.txt
+pip install -r ui_client/requirements.txt
+pip install -r gmail_pubsub_listener/requirements.txt
 ```
 
 ### 4. Run the System
@@ -129,6 +146,7 @@ python -m lead_finder --port 8081
 python -m lead_manager --port 8082
 python -m sdr --port 8084  
 python -m ui_client --port 8000
+python -m gmail_pubsub_listener --port 8083
 ```
 
 #### Option B: Docker Deployment
@@ -138,9 +156,77 @@ make build-all
 make deploy-local
 ```
 
+#### Option C: Cloud Run Deployment
+```bash
+# Deploy to Google Cloud Run
+./deploy_cloud_run.sh
+```
+
 ### 5. Access the Dashboard
 
 Open your browser to `http://localhost:8000` to access the web interface.
+
+## 📖 Service Documentation
+
+Each service has its own detailed README with specific installation and configuration instructions:
+
+- **[🔍 Lead Finder](./lead_finder/README.md)** - Find potential leads using Google Maps
+- **🧠 [SDR Agent](./sdr/README.md)** - Research and outreach automation
+- **📋 [Lead Manager](./lead_manager/README.md)** - Lead qualification and meeting scheduling
+- **🖥️ [UI Client](./ui_client/README.md)** - Web dashboard and monitoring
+- **📧 [Gmail PubSub Service](./gmail_pubsub_listener/README.md)** - Email response handling
+
+## 🔧 Environment Variables
+
+### Global Configuration (.env)
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `GOOGLE_API_KEY` | Google API key for Gemini LLM | Yes |
+| `GOOGLE_MAPS_API_KEY` | Google Maps API key | Yes |
+| `GOOGLE_CLOUD_PROJECT` | GCP project ID for BigQuery | Yes |
+| `ELEVENLABS_API_KEY` | ElevenLabs API key for voice calls | Optional |
+| `EMAIL_USERNAME` | SMTP email username | Optional |
+| `EMAIL_PASSWORD` | SMTP email password | Optional |
+
+### Service-Specific Configuration
+
+Each service can have its own `.env` file for service-specific settings:
+
+- `lead_finder/.env` - Lead finder specific settings
+- `lead_manager/.env` - Lead manager specific settings  
+- `sdr/.env` - SDR agent specific settings
+- `gmail_pubsub_listener/.env` - Gmail service specific settings
+
+## 🐳 Docker Deployment
+
+Each service has its own Dockerfile and can be deployed independently:
+
+```bash
+# Build specific service
+docker build -f Dockerfile.lead_finder -t salesshortcut-lead-finder .
+docker build -f Dockerfile.sdr -t salesshortcut-sdr .
+docker build -f Dockerfile.lead_manager -t salesshortcut-lead-manager .
+docker build -f Dockerfile.ui_client -t salesshortcut-ui-client .
+
+# Deploy to Cloud Run
+./deploy_cloud_run.sh
+```
+
+## 📊 Data Storage
+
+The system uses Google BigQuery for persistent storage:
+
+- **Lead Data**: Business information, contact details, research results
+- **Interaction History**: Call transcripts, email responses, follow-up activities  
+- **Analytics**: Conversion metrics, campaign performance data
+
+## 🔐 Security & Privacy
+
+- All API keys stored securely in environment variables
+- Phone calls comply with telemarketing regulations
+- Business data encrypted in transit and at rest
+- No sensitive information logged or exposed
 
 ## 📖 Usage Guide
 
@@ -182,34 +268,8 @@ Services communicate via HTTP/A2A protocol. Default ports:
 - UI Client: 8000
 - Lead Finder: 8081  
 - Lead Manager: 8082
+- Gmail PubSub: 8083
 - SDR: 8084
-
-## 🐳 Docker Deployment
-
-Each service has its own Dockerfile and can be deployed independently:
-
-```bash
-# Build specific service
-docker build -f Dockerfile.sdr -t salesshortcut-sdr .
-
-# Deploy to Cloud Run
-gcloud run deploy salesshortcut-sdr --source .
-```
-
-## 📊 Data Storage
-
-The system uses Google BigQuery for persistent storage:
-
-- **Lead Data**: Business information, contact details, research results
-- **Interaction History**: Call transcripts, email responses, follow-up activities  
-- **Analytics**: Conversion metrics, campaign performance data
-
-## 🔐 Security & Privacy
-
-- All API keys stored securely in environment variables
-- Phone calls comply with telemarketing regulations
-- Business data encrypted in transit and at rest
-- No sensitive information logged or exposed
 
 ## 🤝 Contributing
 
@@ -234,3 +294,4 @@ For issues, questions, or feature requests:
 ---
 
 **Built with ❤️ for automating the sales development process**
+

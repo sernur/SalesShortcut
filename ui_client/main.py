@@ -1329,11 +1329,11 @@ if __name__ == "__main__":
     logger.info(f"  Lead Finder: python -m lead_finder --port {config.DEFAULT_LEAD_FINDER_PORT}")
     logger.info(f"  SDR: python -m sdr --port {config.DEFAULT_SDR_PORT}")
     logger.info(f"  Lead Manager: python -m lead_manager --port {config.DEFAULT_LEAD_MANAGER_PORT}")
-    logger.info(f"--- Access UI at http://0.0.0.0:{config.DEFAULT_UI_CLIENT_PORT} ---")
+    logger.info(f"--- Access UI at http://0.0.0.0:{config.UI_CLIENT_SERVICE_NAME} ---")
     
     uvicorn.run(
         "ui_client.main:app",
         host="0.0.0.0",
-        port=config.DEFAULT_UI_CLIENT_PORT,
+        port=config.UI_CLIENT_SERVICE_NAME,
         reload=True
     )

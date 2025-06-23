@@ -11,7 +11,7 @@ DEFAULT_LEAD_MANAGER_PORT: int = 8082
 DEFAULT_SDR_PORT: int = 8084
 
 # --- UI Client Configuration ---
-DEFAULT_UI_CLIENT_PORT: int = 8000
+UI_CLIENT_SERVICE_NAME: int = 8000
 
 # --- Human Input Service Configuration ---
 DEFAULT_HUMAN_INPUT_PORT: int = 8000
@@ -22,7 +22,7 @@ DEFAULT_LEAD_MANAGER_URL: str = f"http://127.0.0.1:{DEFAULT_LEAD_MANAGER_PORT}"
 DEFAULT_SDR_URL: str = f"http://127.0.0.1:{DEFAULT_SDR_PORT}"
 
 # --- UI Client URL Configuration ---
-DEFAULT_UI_CLIENT_URL: str = f"http://127.0.0.1:{DEFAULT_UI_CLIENT_PORT}"
+DEFAULT_UI_CLIENT_URL: str = f"http://127.0.0.1:{UI_CLIENT_SERVICE_NAME}"
 
 # --- Human Input Service URL Configuration ---
 DEFAULT_HUMAN_INPUT_URL: str = f"http://127.0.0.1:{DEFAULT_HUMAN_INPUT_PORT}"
