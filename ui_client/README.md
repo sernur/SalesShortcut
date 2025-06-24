@@ -266,6 +266,145 @@ ws.onmessage = function(event) {
 
 ### Testing with curl
 
+#### Human Feedback Popup Testing
+
+```bash
+# 1. Send human input request (triggers popup)
+curl -X POST http://localhost:8000/api/human-input \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request_id": "test-123",
+    "prompt": "Please review this outreach email draft",
+    "type": "email_review",
+    "timestamp": "2025-06-23T10:00:00Z"
+  }'
+
+# 2. Get pending human input requests
+curl -X GET http://localhost:8000/api/human-input
+
+# 3. Submit human response
+curl -X POST http://localhost:8000/api/human-input/test-123 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "request_id": "test-123",
+    "response": "Approved with minor changes"
+  }'
+```
+
+#### SDR Agent Contacted Callback Testing
+
+```bash
+# SDR agent completion callback
+curl -X POST http://localhost:8000/agent_callback \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_type": "sdr",
+    "business_id": "test-business-456",
+    "status": "contacted",
+    "message": "Successfully sent outreach email to contact@example.com",
+    "timestamp": "2025-06-23T10:30:00Z",
+    "data": {
+      "email_sent": true,
+      "contact_email": "contact@example.com",
+      "outreach_type": "cold_email"
+    }
+  }'
+```
+
+#### Lead Manager Callbacks Testing
+
+```bash
+# 1. Hot lead notification (requires business name for new business)
+curl -X POST http://localhost:8000/agent_callback \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_type": "lead_manager",
+    "business_id": "hot-lead-789",
+    "status": "converting",
+    "message": "Hot lead detected - customer showing high interest",
+    "timestamp": "2025-06-23T11:00:00Z",
+    "data": {
+      "name": "Hot Lead Corp",
+      "lead_score": 95,
+      "interest_level": "high",
+      "contact_email": "interested@client.com"
+    }
+  }'
+
+# 2. Meeting scheduled callback (requires business name for new business)
+curl -X POST http://localhost:8000/agent_callback \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_type": "lead_manager",
+    "business_id": "meeting-lead-101",
+    "status": "meeting_scheduled",
+    "message": "Demo meeting scheduled for tomorrow at 2 PM",
+    "timestamp": "2025-06-23T11:15:00Z",
+    "data": {
+      "name": "Meeting Demo Corp",
+      "meeting_time": "2025-06-24T14:00:00Z",
+      "meeting_type": "demo",
+      "calendar_link": "https://calendar.example.com/meeting/123"
+    }
+  }'
+
+# 3. Lead manager search callback (Note: endpoint may not be available in simple_main.py)
+curl -X POST http://localhost:8082/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "test lead search",
+    "ui_client_url": "http://localhost:8000"
+  }'
+```
+
+#### Calendar Agent Testing
+
+```bash
+# Calendar notification callback
+curl -X POST http://localhost:8000/agent_callback \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agent_type": "calendar",
+    "business_id": "calendar-test-202",
+    "status": "meeting_scheduled",
+    "message": "Calendar meeting created successfully",
+    "timestamp": "2025-06-23T11:30:00Z",
+    "data": {
+      "calendar_event_id": "cal-123",
+      "attendees": ["client@example.com", "sales@yourcompany.com"]
+    }
+  }'
+```
+
+#### WebSocket Connection Testing
+
+```bash
+# Test WebSocket connection (use wscat if available)
+wscat -c ws://localhost:8000/ws
+
+# Or use curl to test the endpoint exists
+curl -i -N -H "Connection: Upgrade" \
+     -H "Upgrade: websocket" \
+     -H "Sec-WebSocket-Key: test" \
+     -H "Sec-WebSocket-Version: 13" \
+     http://localhost:8000/ws
+```
+
+#### Health Check Testing
+
+```bash
+# UI health check
+curl -X GET http://localhost:8000/health
+
+# SDR agent health check  
+curl -X GET http://localhost:8084/health
+
+# Lead manager health check
+curl -X GET http://localhost:8082/health
+```
+
+#### Legacy Test Examples
+
 ```bash
 # Test Lead Finder notification
 curl -X POST http://localhost:8000/agent_callback \

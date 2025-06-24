@@ -77,6 +77,9 @@ deploy_cloud: check_env
 	 ANTHROPIC_API_KEY="$(ANTHROPIC_API_KEY)" \
 	 ./deploy_cloud_run.sh $(SERVICES)
 
+deploy_test:
+	./test_deploy.sh	
+
 test_local: clean check_env
 	@echo "🧪 Running local test deployment (UI Client + Lead Manager)..."
 	@chmod +x ./test_local.sh

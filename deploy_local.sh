@@ -20,6 +20,9 @@ if [ -z "$GOOGLE_API_KEY" ]; then
   exit 1
 fi
 
+export GOOGLE_MAPS_API_KEY="${GOOGLE_MAPS_API_KEY:-}"
+
+
 echo "Using GOOGLE_API_KEY for Gemini LLM inference..."
 
 # Start Lead Finder (Default Port: 8081)

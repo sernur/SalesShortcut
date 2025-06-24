@@ -200,90 +200,90 @@ async def phone_call(business_data: dict[str, Any], proposal: str) -> dict[str, 
     
     logger.info("⚒️ [TOOL] 📞 Starting phone call tool...")
     
-    # await 3 seconds to ensure the tool context is ready
-    await asyncio.sleep(3)
-    mock_result = {
-      "status": "done",
-      "transcript": [
-        {
-          "role": "agent",
-          "message": "Hello!.. This is Lexi from Web Solutions Inc. I hope I'm not catching you at a bad time. I'm calling to let you know about our website development services for you. Do you have just a quick moment to chat?"
-        },
-        {
-          "role": "user",
-          "message": "Yes, I would like to receive the email with proposal right away."
-        },
-        {
-          "role": "agent",
-          "message": "Great! I understand that The Sportsman has been a cornerstone of the Logan community for over seventy years, and I'd like..."
-        },
-        {
-          "role": "user",
-          "message": "Yes, just send it to MEINNPS at gmail.com."
-        },
-        {
-          "role": "agent",
-          "message": "Thank you for confirming your email address. Just to be clear, is that M. E. I. N. N. P. S. at gmail dot com? Also, do I..."
-        },
-        {
-          "role": "user",
-          "message": "Yes, sure."
-        },
-        {
-          "role": "agent",
-          "message": "Perfect! I'll send over the proposal right away. If you express interest by replying to the email, we'll create and send you a demo website MVP tailored to your business. After you review it, a..."
-        },
-        {
-          "role": "user",
-          "message": "Okay."
-        },
-        {
-          "role": "agent",
-          "message": "Great, I'm glad we could connect! I'm sending the email now, and a human from our team will contact you later. Have a great rest of your day!"
-        }
-      ],
-      "debug_info": [
-        "Initiating call → +14353173849",
-        "Call started (conversation_id = conv_01jxv205n2f2s96ycrcx00s1cx)",
-        "Polling status: initiated",
-        "Polling status: initiated",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: in-progress",
-        "Polling status: processing",
-        "Polling status: done"
-      ],
-      "error": None,
-      "conversation_id": "conv_01jxv205n2f2s96ycrcx00s1cx"
-    }
+
+    # await asyncio.sleep(3)
+    # mock_result = {
+    #   "status": "done",
+    #   "transcript": [
+    #     {
+    #       "role": "agent",
+    #       "message": "Hello!.. This is Lexi from Web Solutions Inc. I hope I'm not catching you at a bad time. I'm calling to let you know about our website development services for you. Do you have just a quick moment to chat?"
+    #     },
+    #     {
+    #       "role": "user",
+    #       "message": "Yes, I would like to receive the email with proposal right away."
+    #     },
+    #     {
+    #       "role": "agent",
+    #       "message": "Great! I understand that The Sportsman has been a cornerstone of the Logan community for over seventy years, and I'd like..."
+    #     },
+    #     {
+    #       "role": "user",
+    #       "message": "Yes, just send it to MEINNPS at gmail.com."
+    #     },
+    #     {
+    #       "role": "agent",
+    #       "message": "Thank you for confirming your email address. Just to be clear, is that M. E. I. N. N. P. S. at gmail dot com? Also, do I..."
+    #     },
+    #     {
+    #       "role": "user",
+    #       "message": "Yes, sure."
+    #     },
+    #     {
+    #       "role": "agent",
+    #       "message": "Perfect! I'll send over the proposal right away. If you express interest by replying to the email, we'll create and send you a demo website MVP tailored to your business. After you review it, a..."
+    #     },
+    #     {
+    #       "role": "user",
+    #       "message": "Okay."
+    #     },
+    #     {
+    #       "role": "agent",
+    #       "message": "Great, I'm glad we could connect! I'm sending the email now, and a human from our team will contact you later. Have a great rest of your day!"
+    #     }
+    #   ],
+    #   "debug_info": [
+    #     "Initiating call → +14353173849",
+    #     "Call started (conversation_id = conv_01jxv205n2f2s96ycrcx00s1cx)",
+    #     "Polling status: initiated",
+    #     "Polling status: initiated",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: in-progress",
+    #     "Polling status: processing",
+    #     "Polling status: done"
+    #   ],
+    #   "error": None,
+    #   "conversation_id": "conv_01jxv205n2f2s96ycrcx00s1cx"
+    # }
     
-    return mock_result 
+    # return mock_result 
 
 
     # Initialize logging to file

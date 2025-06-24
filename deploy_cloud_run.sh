@@ -197,31 +197,79 @@ fi
 if echo "$DEPLOY_SERVICES" | grep -qw "sdr"; then
   echo "Deploying SDR..."
 
-# Step 3.1: Build and Push Image using Cloud Build Config
-echo "Building SDR image using $SDR_BUILDFILE..."
-gcloud builds submit . --config=$SDR_BUILDFILE \
-    --substitutions=_REGION=$REGION,_REPO_NAME=$REPOSITORY_NAME \
-    --project=$PROJECT_ID --quiet
+  # Step 3.1: Build and Push Image using Cloud Build Config
+  echo "Building SDR image using $SDR_BUILDFILE..."
+  gcloud builds submit . --config=$SDR_BUILDFILE \
+      --substitutions=_REGION=$REGION,_REPO_NAME=$REPOSITORY_NAME \
+      --project=$PROJECT_ID --quiet
 
-# Step 3.2: Deploy to Cloud Run (passing Lead Manager URL)
-echo "Getting latest image digest for SDR..."
-SDR_DIGEST=$(gcloud artifacts docker images list $AR_PREFIX/sdr --format="value(DIGEST)" --limit=1 --project=$PROJECT_ID)
-echo "Using image digest: $SDR_DIGEST"
-echo "Deploying SDR service ($SDR_SERVICE_NAME)..."
-# Prepare environment variables for SDR (root, service .env, and peer URL)
-ENV_VARS=$(get_env_vars_string "sdr")
-ENV_VARS="${ENV_VARS},LEAD_MANAGER_SERVICE_URL=$LEAD_MANAGER_SERVICE_URL"
-gcloud run deploy $SDR_SERVICE_NAME \
-    --image=$AR_PREFIX/sdr@$SDR_DIGEST \
+  # Step 3.2: Wait for build to complete and get image digest
+  echo "Getting latest image digest for SDR..."
+  
+  # Wait a moment for the image to be available
+  sleep 5
+  
+  # Try to get the digest with error handling
+  SDR_DIGEST=$(gcloud artifacts docker images list $AR_PREFIX/sdr \
+    --format="value(DIGEST)" \
+    --limit=1 \
+    --project=$PROJECT_ID 2>/dev/null)
+  
+  if [ -z "$SDR_DIGEST" ]; then
+    echo "Warning: Could not get image digest. Using latest tag instead."
+    SDR_IMAGE="$AR_PREFIX/sdr:latest"
+  else
+    echo "Using image digest: $SDR_DIGEST"
+    SDR_IMAGE="$AR_PREFIX/sdr@$SDR_DIGEST"
+  fi
+
+  # Step 3.3: Deploy to Cloud Run
+  echo "Deploying SDR service ($SDR_SERVICE_NAME)..."
+  
+  # Prepare environment variables for SDR (root, service .env, and peer URLs)
+  ENV_VARS=$(get_env_vars_string "sdr")
+  
+  # Add service URLs if available
+  if [ -n "$LEAD_MANAGER_SERVICE_URL" ]; then
+    ENV_VARS="${ENV_VARS},LEAD_MANAGER_SERVICE_URL=$LEAD_MANAGER_SERVICE_URL"
+  fi
+  
+  # Deploy with proper resource allocation for A2A service
+  gcloud run deploy $SDR_SERVICE_NAME \
+      --image=$SDR_IMAGE \
+      --platform managed \
+      --region $REGION \
+      --allow-unauthenticated \
+      --port 8080 \
+      --memory 2Gi \
+      --cpu 2 \
+      --timeout 300 \
+      --max-instances 10 \
+      --min-instances 0 \
+      --concurrency 80 \
+      --set-env-vars="$ENV_VARS" \
+      --project=$PROJECT_ID
+
+  # Step 3.4: Get Service URL and verify deployment
+  export SDR_SERVICE_URL=$(gcloud run services describe $SDR_SERVICE_NAME \
     --platform managed \
     --region $REGION \
-    --allow-unauthenticated \
-    --set-env-vars="$ENV_VARS" \
-    --project=$PROJECT_ID
-
-# Step 3.3: Get Service URL
-export SDR_SERVICE_URL=$(gcloud run services describe $SDR_SERVICE_NAME --platform managed --region $REGION --format 'value(status.url)' --project=$PROJECT_ID)
+    --format 'value(status.url)' \
+    --project=$PROJECT_ID)
+  
   echo "SDR URL: $SDR_SERVICE_URL"
+  
+  # Verify the service is healthy
+  echo "Verifying SDR service health..."
+  sleep 10  # Give the service time to start
+  
+  if curl -f "$SDR_SERVICE_URL/health" --max-time 30; then
+    echo "✅ SDR service is healthy!"
+  else
+    echo "⚠️  SDR service health check failed. Check logs:"
+    echo "gcloud run logs read $SDR_SERVICE_NAME --region=$REGION --project=$PROJECT_ID"
+  fi
+  
   echo "---"
 fi
 
