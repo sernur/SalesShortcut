@@ -190,6 +190,120 @@ def main(host: str, port: int):
             )
         )
 
+        # Health check endpoint
+        async def health_check(request: Request):
+            """Simple health check endpoint"""
+            return JSONResponse({
+                'status': 'healthy',
+                'message': 'SDR service is running',
+                'endpoints': [
+                    '/test/ui-callback',
+                    '/test/human-creation',
+                    '/api/human-input/{request_id}',
+                    '/authenticate'
+                ]
+            })
+        
+        app.routes.append(
+            Route(
+                path='/health',
+                methods=['GET'],
+                endpoint=health_check
+            )
+        )
+
+        # Test endpoints for SDR <-> UI communication testing
+        from sdr.sdr.callbacks import send_sdr_update_to_ui
+        from sdr.sdr.sub_agents.outreach_email_agent.sub_agents.website_creator.tools.human_creation_tool import send_ui_notification
+        
+        async def test_ui_callback(request: Request):
+            """Test endpoint to trigger send_sdr_update_to_ui functionality"""
+            try:
+                # Sample business data for testing
+                test_business_data = {
+                    "id": "test-123",
+                    "name": "Test Business Corp",
+                    "address": "123 Main St, San Francisco, CA, 94105",
+                    "phone": "+1234567890",
+                    "email": "test@testbusiness.com"
+                }
+                
+                # Sample email result for testing
+                test_email_result = {
+                    "status": "success",
+                    "message": "Test email sent",
+                    "crafted_email": {
+                        "to": "test@testbusiness.com",
+                        "subject": "Test Subject - SDR Communication Test",
+                        "body": "This is a test email body to verify SDR-UI communication is working properly."
+                    }
+                }
+                
+                # Call the actual function
+                success = send_sdr_update_to_ui(test_business_data, test_email_result)
+                
+                return JSONResponse({
+                    'status': 'success' if success else 'failed',
+                    'message': 'UI callback test completed',
+                    'test_data': {
+                        'business_data': test_business_data,
+                        'email_result': test_email_result
+                    },
+                    'ui_callback_success': success
+                })
+            except Exception as e:
+                logger.error(f"Test UI callback error: {e}")
+                return JSONResponse({
+                    'status': 'error',
+                    'message': f'Test failed: {str(e)}'
+                }, status_code=500)
+
+        async def test_human_creation(request: Request):
+            """Test endpoint to trigger human_creation functionality"""
+            try:
+                # Get test prompt from query params or use default
+                prompt = request.query_params.get('prompt', 'Create a test website for communication testing between SDR and UI')
+                
+                # Test the send_ui_notification function (without full human_creation flow)
+                test_request_id = f"test-{hash(prompt) % 100000}"
+                
+                # Send notification to UI
+                success = await send_ui_notification(test_request_id, prompt)
+                
+                return JSONResponse({
+                    'status': 'success' if success else 'failed',  
+                    'message': 'Human creation test completed',
+                    'test_data': {
+                        'request_id': test_request_id,
+                        'prompt': prompt
+                    },
+                    'ui_notification_success': success,
+                    'note': 'This tests the UI notification part of human_creation. Full workflow requires actual human interaction.'
+                })
+            except Exception as e:
+                logger.error(f"Test human creation error: {e}")
+                return JSONResponse({
+                    'status': 'error',
+                    'message': f'Test failed: {str(e)}'
+                }, status_code=500)
+        
+        # Add test endpoints
+        app.routes.append(
+            Route(
+                path='/test/ui-callback',
+                methods=['GET'],
+                endpoint=test_ui_callback
+            )
+        )
+        
+        app.routes.append(
+            Route(
+                path='/test/human-creation',
+                methods=['GET'], 
+                endpoint=test_human_creation
+            )
+        )
+
         logger.info(f"Starting RiskGuard A2A server on http://{host}:{port}/")
         uvicorn.run(app, host=host, port=port) # Run the modified Starlette app
     except Exception as e:
