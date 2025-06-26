@@ -27,7 +27,7 @@ echo "Using GOOGLE_API_KEY for Gemini LLM inference..."
 
 # Start Lead Finder (Default Port: 8081)
 echo "Starting Lead Finder service in the background..."
-python -m lead_finder &
+GOOGLE_MAPS_API_KEY="$GOOGLE_MAPS_API_KEY" python -m lead_finder &
 LEAD_FINDER_PID=$!
 echo "Lead Finder started with PID: $LEAD_FINDER_PID"
 
