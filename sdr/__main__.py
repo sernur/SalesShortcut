@@ -40,9 +40,6 @@ try:
     if not ADK_AVAILABLE:
         raise ImportError(f"A2A/ADK dependency missing: {missing_dep}")
 
-    # For Cloud Run, the public URL must be known. Get it from an env var.
-    # Your deploy script sets SDR_SERVICE_URL, which we use here.
-    # We fall back to a local default if the env var isn't set.
     SDR_PUBLIC_URL = os.environ.get("SDR_SERVICE_URL", "http://localhost:8084")
 
     logger.info(f"Configuring SDR Agent with public URL: {SDR_PUBLIC_URL}")
@@ -108,6 +105,23 @@ try:
 
     # --- Define and append all routes to the global `app` object ---
 
+    # --- FIX: Define and INSERT the health check FIRST to ensure it is not overridden ---
+    async def health_check(request: Request):
+        """Simple health check endpoint"""
+        return JSONResponse({
+            'status': 'healthy',
+            'message': 'SDR service is running',
+            'endpoints': [
+                '/test/ui-callback',
+                '/test/human-creation',
+                '/api/human-input/{request_id}',
+                '/authenticate'
+            ]
+        })
+    app.routes.insert(0, Route(path='/health', methods=['GET'], endpoint=health_check))
+
+
+    # --- Now add all OTHER routes as before ---
     app.routes.append(
         Route(
             path='/authenticate',
@@ -135,23 +149,6 @@ try:
 
     app.routes.append(
         Route(path='/api/human-input/{request_id}', methods=['POST'], endpoint=human_input_callback)
-    )
-
-    async def health_check(request: Request):
-        """Simple health check endpoint"""
-        return JSONResponse({
-            'status': 'healthy',
-            'message': 'SDR service is running',
-            'endpoints': [
-                '/test/ui-callback',
-                '/test/human-creation',
-                '/api/human-input/{request_id}',
-                '/authenticate'
-            ]
-        })
-
-    app.routes.append(
-        Route(path='/health', methods=['GET'], endpoint=health_check)
     )
 
     async def test_ui_callback(request: Request):
@@ -207,11 +204,6 @@ def main(host: str, port: int):
     In production (Docker/Cloud Run), Uvicorn is called directly.
     """
     logger.info(f"Starting development server on http://{host}:{port}/")
-    
-    #
-    # --- THIS IS THE FIX ---
-    # Use the "import string" format to allow the `reload` feature to work correctly.
-    #
     uvicorn.run("sdr.__main__:app", host=host, port=port, reload=True)
 
 
